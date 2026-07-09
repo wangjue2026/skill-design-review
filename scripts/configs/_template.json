@@ -1,0 +1,60 @@
+{
+  "_comment": "review_config.json 模板 — AI 每次执行检视时按此格式填写，runner.js 读取并执行",
+  "_howto": "运行命令: node scripts/runner.js scripts/configs/this_file.json",
+
+  "project": "项目名称，例如：SASE 全球加速 GA",
+  "scenario": "检视场景，例如：场景 1: 零基础网管首次独立配置加速",
+  "persona": "测试角色，例如：零基础运维 / 企业网管",
+  "base_url": "http://localhost:8080",
+  "viewport": { "width": 1440, "height": 900 },
+  "assets_dir": "../../Reports/assets",
+
+  "steps": [
+    {
+      "name": "步骤名称 (用于日志标识)",
+      "actions": [
+        { "type": "navigate", "url": "/your-page.html" },
+        { "type": "wait", "ms": 500 },
+
+        { "type": "click", "selector": "text/按钮文字" },
+        { "type": "click", "selector": "css:#some-id > button" },
+
+        { "type": "type", "selector": "input[placeholder='请输入']", "value": "输入内容" },
+
+        { "type": "alpine_set", "selector": "main", "data": {
+          "step": 2,
+          "showModal": true,
+          "sourceRows[0].target": "crm.company.com"
+        }},
+
+        { "type": "eval", "script": "document.querySelector('.some-btn').click(); return 'done';" },
+
+        { "type": "scroll_to", "selector": ".target-element" }
+      ],
+      "screenshot": {
+        "file": "01_page_name.png",
+        "annotations": [
+          {
+            "selector": "css:.target-element",
+            "label": "[P2-较重] 问题描述",
+            "color": "orange"
+          },
+          {
+            "selector": "text/关键文字",
+            "label": "[P1-严重] 严重问题描述",
+            "color": "red"
+          }
+        ]
+      }
+    },
+
+    {
+      "_comment": "无截图的步骤示例 (只做操作, 不截图)",
+      "name": "仅执行动作, 不截图",
+      "actions": [
+        { "type": "navigate", "url": "/next-page.html" },
+        { "type": "wait", "ms": 800 }
+      ]
+    }
+  ]
+}

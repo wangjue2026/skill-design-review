@@ -1,0 +1,23 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+node_modules/
+.npm/

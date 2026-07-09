@@ -1,0 +1,30 @@
+{
+  "_comment": "review_issues.json 模板 — AI 检视分析完成后填写，report_builder.py 读取生成 HTML 报告",
+  "_howto": "运行命令: python3 scripts/report_builder.py scripts/configs/this_file.json",
+
+  "project": "SASE 全球加速 GA",
+  "scenario": "场景 1: 体验目标的达成",
+  "persona": "零基础运维 / 企业网管",
+  "date": "2026-07-07",
+
+  "issues": [
+    {
+      "img_file": "01_initial_page.png",
+      "scenario_tag": "初始选择页",
+      "dimension_tag": "认知与反馈 (心智模型)",
+      "severity": "p2",
+      "title": "【P2 较重】问题标题",
+      "description": "问题的详细描述，说明什么情况下会发生，对用户造成什么影响。",
+      "solution": "建议的改进方案，具体可执行的 To-Be 方向。"
+    },
+    {
+      "img_file": "07_display_list.png",
+      "scenario_tag": "状态监控",
+      "dimension_tag": "认知与反馈 (虚假状态反馈)",
+      "severity": "p1",
+      "title": "【P1 严重】问题标题",
+      "description": "...",
+      "solution": "..."
+    }
+  ]
+}
