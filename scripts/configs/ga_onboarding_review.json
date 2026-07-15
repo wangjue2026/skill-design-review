@@ -1,0 +1,157 @@
+{
+  "project": "全球加速 GA Onboarding 体验检视",
+  "scenario": "场景 1: 零基础网管首次独立配置加速",
+  "persona": "零基础运维 / 企业网管",
+  "base_url": "http://127.0.0.1:8085",
+  "viewport": { "width": 1440, "height": 900 },
+  "assets_dir": "../../Reports/assets",
+  "steps": [
+    {
+      "name": "步骤 1: 初始场景选择页，学习配置原理与选择自定义加速场景",
+      "actions": [
+        { "type": "navigate", "url": "/Demos/GA-initial.html" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "text/自定义 IP/域名加速" },
+        { "type": "wait", "ms": 500 }
+      ],
+      "screenshot": {
+        "file": "01_initial_page.png",
+        "annotations": [
+          {
+            "selector": "text/学习配置原理",
+            "label": "[P3-轻微] 学习配置原理按钮位置偏低且不够醒目，首次购买GA的零基础网管很容易忽略此入口，建议升级为显性引导。",
+            "color": "yellow"
+          },
+          {
+            "selector": "text/自定义 IP/域名加速",
+            "label": "[P2-较重] 场景分类对零基础用户有认知难度。用户需区分业务是单IP还是分支机构，新手可能在‘分支组网加速’与‘自定义IP加速’之间产生混淆。",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 2: 仅做场景跳转",
+      "actions": [
+        { "type": "click", "selector": "text/创建加速" },
+        { "type": "wait", "ms": 3000 }
+      ]
+    },
+    {
+      "name": "步骤 3: 步骤一 - 填写源站IP与选择源站区域",
+      "actions": [
+        { "type": "wait", "ms": 2000 },
+        { "type": "type", "selector": "input[x-model='row.target']", "value": "1.1.1.1" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/请选择源站最近的加速位置" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/北京" },
+        { "type": "wait", "ms": 500 }
+      ],
+      "screenshot": {
+        "file": "02_config_step1.png",
+        "annotations": [
+          {
+            "selector": "input[x-model='row.target']",
+            "label": "[P4-瑕疵] 源站对象输入框缺少格式校验提示与示例，零基础用户不确定是输入公网IP、内网IP还是带端口的格式。",
+            "color": "blue"
+          },
+          {
+            "selector": "text/北京",
+            "label": "[P3-轻微] ‘源站区域（下车点）’的专业术语对于零基础网管较为晦涩，虽然有悬浮解释，但主干文案心智隐喻略重。",
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 4: 跳转至步骤二",
+      "actions": [
+        { "type": "click", "selector": "text/下一步" },
+        { "type": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "name": "步骤 5: 步骤二 - 选择加速区域(日本/韩国)与加速端口配置",
+      "actions": [
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/请选择加速位置" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/亚太地区" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/东京" },
+        { "type": "click", "selector": "text/首尔" },
+        { "type": "click", "selector": "text/确定加速范围" },
+        { "type": "wait", "ms": 500 },
+        { "type": "type", "selector": "input[x-model='pRow.originPort']", "value": "443" },
+        { "type": "wait", "ms": 500 }
+      ],
+      "screenshot": {
+        "file": "03_config_step2.png",
+        "annotations": [
+          {
+            "selector": "text/东京",
+            "label": "[P3-轻微] ‘选择加速区域（上车点加速pop）’文案混杂了‘上车点’与‘pop’两个专业术语，对零基础运维而言认知负担过重。",
+            "color": "yellow"
+          },
+          {
+            "selector": "input[x-model='pRow.originPort']",
+            "label": "[P2-较重] 回源端口输入框仅支持输入单个数字，若用户业务系统有多个端口需要加速，被迫需要点击+号逐个添加，交互效率低下。",
+            "color": "orange"
+          },
+          {
+            "selector": "text/高级配置",
+            "label": "[P3-轻微] 高级配置（独享IP、透传、传输优化）默认全部折叠且无推荐选项，对于零基础用户而言，无法判断是否需要开启，缺乏辅助决策引导。",
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 6: 跳转至步骤三",
+      "actions": [
+        { "type": "click", "selector": "text/下一步" },
+        { "type": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "name": "步骤 7: 步骤三 - 链路预览与确认发布",
+      "actions": [
+        { "type": "wait", "ms": 1000 }
+      ],
+      "screenshot": {
+        "file": "04_config_step3.png",
+        "annotations": [
+          {
+            "selector": "text/源站对象",
+            "label": "[P1-严重] 链路预览中的‘加速端口’显示为‘待自动生成’，并且没有任何说明。零基础网管在发布规则前，完全不知道客户端最终应该使用哪个端口来连接加速，这导致核心任务流存在认知断裂。",
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 8: 点击保存发布并跳转至状态展示页",
+      "actions": [
+        { "type": "click", "selector": "text/保存" },
+        { "type": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "name": "步骤 9: 加速状态列表页 - 查看最终状态",
+      "actions": [
+        { "type": "wait", "ms": 1500 }
+      ],
+      "screenshot": {
+        "file": "05_display_page.png",
+        "annotations": [
+          {
+            "selector": "text/1.1.1.1",
+            "label": "[P4-瑕疵] 虽然提示保存成功并返回了列表页，但新生成的加速规则列表中，‘加速 IP’分配情况不够醒目，缺少对客户端如何配置的最终说明引导（如一键生成客户端配置指南）。",
+            "color": "blue"
+          }
+        ]
+      }
+    }
+  ]
+}

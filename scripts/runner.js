@@ -63,7 +63,8 @@ async function getBoundingRect(page, rawSel) {
         const style = window.getComputedStyle(e);
         return e.innerText && e.innerText.trim().includes(selObj.value)
           && style.display !== 'none'
-          && style.visibility !== 'hidden';
+          && style.visibility !== 'hidden'
+          && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
       });
     }
     if (!el) return null;
@@ -143,7 +144,8 @@ async function executeAction(page, action, config, resolvedAssetsDir) {
               .find(e => {
                 const s = window.getComputedStyle(e);
                 return e.innerText && e.innerText.trim().includes(txt)
-                  && s.display !== 'none' && s.visibility !== 'hidden';
+                  && s.display !== 'none' && s.visibility !== 'hidden'
+                  && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
               }) || null;
           }, sel.value);
           const el = handle.asElement();
@@ -273,7 +275,8 @@ const resolvedAssetsDir = path.resolve(configDir, config.assets_dir || '../../Re
   console.log('─'.repeat(60));
 
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: false,
+    slowMo: 150, // 增加每步延迟，便于用户肉眼跟随走查细节
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 

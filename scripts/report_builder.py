@@ -14,6 +14,7 @@ Issues JSON 格式: 见 scripts/configs/_template_issues.json
 import os
 import sys
 import json
+import base64
 from datetime import datetime
 
 # ──────────────────────────────────────────────────────────────
@@ -66,11 +67,28 @@ SEVERITY_DISPLAY = {
     'p4': 'P4 - 瑕疵',
 }
 
-def build_issue_card(issue):
+def build_issue_card(issue, standalone=False):
     img_file = issue.get('img_file', '')
-    # 图片路径相对于报告文件 (Reports/) 是 assets/<img_file>
-    img_url = f"assets/{img_file}" if img_file else ''
     sev = issue.get('severity', 'p3').lower()
+    
+    img_url = ''
+    if img_file:
+        if standalone:
+            img_path = os.path.join(REPORTS_DIR, 'assets', img_file)
+            if os.path.exists(img_path):
+                try:
+                    with open(img_path, 'rb') as f:
+                        img_data = f.read()
+                    ext = os.path.splitext(img_file)[1].lower()
+                    mime = 'image/png' if ext == '.png' else ('image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/gif')
+                    img_url = f"data:{mime};base64,{base64.b64encode(img_data).decode('utf-8')}"
+                except Exception as e:
+                    print(f"Error encoding image {img_file}: {e}")
+                    img_url = f"assets/{img_file}"
+            else:
+                img_url = f"assets/{img_file}"
+        else:
+            img_url = f"assets/{img_file}"
 
     return f"""
             <div class="issue-card">
@@ -95,7 +113,7 @@ def build_issue_card(issue):
             </div>
 """
 
-def build_report(data):
+def build_report(data, standalone=False):
     issues = data.get('issues', [])
     project = data.get('project', '未命名项目')
     scenario = data.get('scenario', '—')
@@ -128,9 +146,13 @@ def build_report(data):
     content = content.replace('{{P2_COUNT}}', str(p2))
     content = content.replace('{{P3_COUNT}}', str(p3))
     content = content.replace('{{P4_COUNT}}', str(p4))
+    
+    # 注入定性结论
+    conclusion_html = data.get('conclusion', '<p style="color: var(--text-dim);">未提供定性检视结论。</p>')
+    content = content.replace('{{QUALITATIVE_CONCLUSION}}', conclusion_html)
 
     # 生成问题列表 HTML
-    issue_list_html = '\n'.join(build_issue_card(issue) for issue in issues)
+    issue_list_html = '\n'.join(build_issue_card(issue, standalone=standalone) for issue in issues)
 
     # 注入问题列表
     start_ph = '<!-- ISSUE_LIST_START -->'
@@ -163,9 +185,9 @@ if __name__ == '__main__':
     with open(issues_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    html_content, score, total, p1, p2, p3, p4 = build_report(data)
-
-    # 输出文件名：[project]_设计检视报告_YYYYMMDD.html
+    # 1. 生成普通版本（引用外部资产图片）
+    html_content, score, total, p1, p2, p3, p4 = build_report(data, standalone=False)
+    
     project_slug = data.get('project', 'Review').replace(' ', '_').replace('/', '_')
     date_tag = data.get('date', datetime.now().strftime('%Y%m%d')).replace('-', '')
     output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
@@ -174,7 +196,16 @@ if __name__ == '__main__':
     os.makedirs(REPORTS_DIR, exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
+    print(f'\n✅ Standard Report generated: {output_path}')
 
-    print(f'\n✅ Report generated: {output_path}')
+    # 2. 生成 Standalone 版本（图片 Base64 内联）
+    html_content_standalone, _, _, _, _, _, _ = build_report(data, standalone=True)
+    output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'
+    output_path_standalone = os.path.join(REPORTS_DIR, output_filename_standalone)
+    
+    with open(output_path_standalone, 'w', encoding='utf-8') as f:
+        f.write(html_content_standalone)
+    print(f'✅ Standalone Report generated: {output_path_standalone}')
+    
     print(f'   Total issues : {total} (P1:{p1} P2:{p2} P3:{p3} P4:{p4})')
     print(f'   Score        : {score:.1f} / 100')
