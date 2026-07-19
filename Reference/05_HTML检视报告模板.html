@@ -219,14 +219,21 @@
         }
 
         .conclusion-box {
-            background: rgba(58, 134, 255, 0.05);
+            background: rgba(58, 134, 255, 0.04);
             border: 1px solid var(--border-color);
-            padding: 24px;
+            padding: 28px 32px;
             border-radius: 12px;
         }
 
+        /* 整体评价段：首个 h3 + p 用淡蓝背景区隔 */
+        .conclusion-box h3:first-child {
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
         .conclusion-box h3 {
-            margin-top: 0;
+            margin-top: 24px;
             margin-bottom: 10px;
             color: #fff;
             font-size: 15px;
@@ -238,23 +245,39 @@
         .conclusion-box p {
             color: var(--text-main);
             font-size: 13px;
-            margin-bottom: 20px;
-            line-height: 1.6;
+            margin-bottom: 12px;
+            margin-top: 0;
+            line-height: 1.8;
         }
 
         .conclusion-box p:last-child {
             margin-bottom: 0;
         }
 
+        /* 好的点 / 不足的点 列表 */
         .conclusion-box ul {
-            margin: 5px 0 15px 0;
-            padding-left: 20px;
+            margin: 4px 0 16px 0;
+            padding-left: 18px;
             color: var(--text-main);
             font-size: 13px;
+            line-height: 1.8;
         }
 
         .conclusion-box li {
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        /* 不足的点下的子 ul（场景内具体问题点）*/
+        .conclusion-box ul ul {
+            margin: 4px 0 4px 0;
+            padding-left: 16px;
+            color: var(--text-dim);
+            list-style-type: none;
+        }
+
+        .conclusion-box ul ul li::before {
+            content: '— ';
+            color: var(--text-dim);
         }
 
         .status-badge {
@@ -264,8 +287,10 @@
             font-size: 11px;
             font-weight: 600;
         }
-        .status-pass { background: rgba(63, 185, 80, 0.15); color: var(--accent-primary); }
-        .status-fail { background: rgba(248, 81, 73, 0.15); color: var(--accent-error); }
+        .status-pass    { background: rgba(63, 185, 80, 0.15);  color: var(--accent-primary); }
+        .status-success { background: rgba(63, 185, 80, 0.15);  color: var(--accent-primary); }
+        .status-fail    { background: rgba(248, 81, 73, 0.15);  color: var(--accent-error); }
+        .status-danger  { background: rgba(248, 81, 73, 0.15);  color: var(--accent-error); }
         .status-warning { background: rgba(210, 153, 34, 0.15); color: var(--accent-warning); }
 
         /* Scoring Rules Section */

@@ -94,6 +94,27 @@ async function screenshotAndAnnotate(page, outputPath, annotations, assetsDir) {
   for (const ann of annotations) {
     const rect = await getBoundingRect(page, ann.selector);
     if (rect) {
+      // 回显命中元素的文字，供 AI 对照确认标注打在了正确目标上
+      const hitText = await page.evaluate((selObj) => {
+        let el;
+        if (selObj.type === 'css') {
+          el = document.querySelector(selObj.value);
+        } else if (selObj.type === 'xpath') {
+          const result = document.evaluate(selObj.value, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          el = result.singleNodeValue;
+        } else if (selObj.type === 'text') {
+          const tags = ['button', 'a', 'span', 'div', 'td', 'th', 'label', 'li'];
+          const candidates = tags.flatMap(tag => Array.from(document.querySelectorAll(tag)));
+          el = candidates.find(e => {
+            const s = window.getComputedStyle(e);
+            return e.innerText && e.innerText.trim().includes(selObj.value)
+              && s.display !== 'none' && s.visibility !== 'hidden'
+              && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
+          }) || null;
+        }
+        return el ? (el.innerText || el.textContent || '').trim().slice(0, 60) : '';
+      }, { type: ann.selector.startsWith('text/') ? 'text' : ann.selector.startsWith('xpath/') ? 'xpath' : 'css', value: ann.selector.startsWith('text/') ? ann.selector.slice(5) : ann.selector.startsWith('xpath/') ? ann.selector.slice(6) : ann.selector.startsWith('css:') ? ann.selector.slice(4) : ann.selector }).catch(() => '');
+      console.log(`  [annotate: hit] selector="${ann.selector}" → 命中元素文字: "${hitText || '(无文字/图标类元素)'}"`);
       processedAnnotations.push({ rect, label: ann.label, color: ann.color || 'orange' });
     } else {
       console.warn(`  [annotate] Selector not found or zero-size: ${ann.selector}`);

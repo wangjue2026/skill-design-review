@@ -1,0 +1,134 @@
+{
+  "project": "全球加速 GA SDP 零信任应用加速走查",
+  "scenario": "场景 1 + 2 + 3: 零信任访问加速配置走查",
+  "persona": "企业网管 / 零信任应用配置员",
+  "base_url": "http://127.0.0.1:8085",
+  "viewport": { "width": 1440, "height": 900 },
+  "assets_dir": "../../Reports/assets",
+  "steps": [
+    {
+      "name": "步骤 1: 初始页，选择零信任访问加速场景",
+      "actions": [
+        { "type": "navigate", "url": "/Demos/GA-initial.html" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "text/零信任访问加速" },
+        { "type": "wait", "ms": 500 }
+      ],
+      "screenshot": {
+        "file": "01_initial_selection.png",
+        "annotations": [
+          {
+            "selector": "text/零信任访问加速",
+            "label": "[P4-瑕疵] 初始页场景描述中，‘aTrust’与‘零信任’缩写混用，对小白用户可能会有一定的认知转换成本。",
+            "color": "blue"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 2: 进入SDP配置页并填写源站网关、搜索源站区域",
+      "actions": [
+        { "type": "click", "selector": "text/开始配置" },
+        { "type": "wait", "ms": 3000 },
+        { "type": "click", "selector": "css:div[\\@click*='t-']" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/sh-gw.atrust-vpn.com" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/需要加速的业务对象" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "css:div[\\@click*='l-']" },
+        { "type": "wait", "ms": 500 },
+        { "type": "type", "selector": "input[placeholder='搜索地理位置，不存在则选择距离最近位置的选项']", "value": "上海" },
+        { "type": "wait", "ms": 1000 }
+      ],
+      "screenshot": {
+        "file": "02_step1_search_shanghai.png",
+        "annotations": [
+          {
+            "selector": "input[placeholder='搜索地理位置，不存在则选择距离最近位置的选项']",
+            "label": "[P2-较重] 搜索源站区域‘上海’没有直接匹配项，系统推荐了‘深圳’。但从地理位置上，上海距离深圳十分遥远，推荐‘深圳’不符合物理临近的认知，也未提供为何推荐深圳的说明，容易造成心智摩擦。",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 3: 接受深圳推荐并点击下一步",
+      "actions": [
+        { "type": "click", "selector": "css:button[x-text*='getRecommendedPop']" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/下一步" },
+        { "type": "wait", "ms": 1500 }
+      ],
+      "screenshot": {
+        "file": "03_step1_completed.png",
+        "annotations": [
+          {
+            "selector": "css:div.flex-1:nth-child(2) > div[class*='text-slate-500']",
+            "label": "[P3-轻微] 界面主干文案‘业务所在地理区域（源站区域/下车点）’混杂了‘源站区域’与‘下车点’，且悬浮气泡中的原理解释偏网络工程思维，零基础网管自主读懂难度较大。",
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 4: SDP配置页第二步 - 展开加速区域选择亚太地区的吉隆坡与东京",
+      "actions": [
+        { "type": "click", "selector": "css:div[\\@click*='openPopDropdown']" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/亚太地区" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/吉隆坡" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/东京" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "text/确定加速范围及带宽" },
+        { "type": "wait", "ms": 500 }
+      ],
+      "screenshot": {
+        "file": "04_step2_pop_selection.png",
+        "annotations": [
+          {
+            "selector": "css:div[\\@click*='openPopDropdown']",
+            "label": "[P3-轻微] 选择加速区域的交互较重。在大区（亚太）下的城市多选时，缺少一键全选或搜索过滤结果快速勾选能力，对大批量配置不友好。",
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 5: SDP配置页第二步 - 点击下一步跳转至链路预览",
+      "actions": [
+        { "type": "click", "selector": "text/下一步" },
+        { "type": "wait", "ms": 1500 }
+      ],
+      "screenshot": {
+        "file": "05_step2_completed.png",
+        "annotations": [
+          {
+            "selector": "text/区域带宽共享",
+            "label": "[P4-瑕疵] 带宽划拨中的‘区域带宽共享’和‘自定义峰值带宽’提示语排版较挤，数值单位缺少规范 of 空格（如‘Mbps’前无空格）。",
+            "color": "blue"
+          }
+        ]
+      }
+    },
+    {
+      "name": "步骤 6: SDP配置页第三步 - 链路预览并保存发布",
+      "actions": [
+        { "type": "click", "selector": "text/保存" },
+        { "type": "wait", "ms": 2000 }
+      ],
+      "screenshot": {
+        "file": "06_step3_preview.png",
+        "annotations": [
+          {
+            "selector": "text/加速状态",
+            "label": "[P1-严重] 加速链路预览中仍使用‘上车点’、‘下车点’等底层网络拓扑隐喻，没有实现业务级意图的直观呈现；且保存后缺少针对吉隆坡与东京分公司客户端配置步骤的任何闭环引导，新配置处于‘生效中’状态但客户端无法接入，核心任务流未能完美闭环。",
+            "color": "red"
+          }
+        ]
+      }
+    }
+  ]
+}
