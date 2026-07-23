@@ -22,7 +22,7 @@ from datetime import datetime
 # ──────────────────────────────────────────────────────────────
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_PATH = os.path.join(SCRIPT_DIR, '..', 'Reference', '05_HTML检视报告模板.html')
+TEMPLATE_PATH = os.path.join(SCRIPT_DIR, '..', 'references', '05_HTML检视报告模板.html')
 REPORTS_DIR = os.path.join(SCRIPT_DIR, '..', 'Reports')
 
 # 扣分规则

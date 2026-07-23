@@ -10,7 +10,7 @@
  * Config 文件格式: 见 scripts/configs/_template.json
  */
 
-const puppeteer = require('/Users/wj/Desktop/项目文件/SMG-GA/scripts/node_modules/puppeteer');
+const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
@@ -285,7 +285,9 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
 // assets_dir 相对于 config 文件的目录来解析
 const configDir = path.dirname(configPath);
-const resolvedAssetsDir = path.resolve(configDir, config.assets_dir || '../../Reports/assets');
+const resolvedAssetsDir = config.assets_dir
+  ? path.resolve(configDir, config.assets_dir)
+  : path.resolve(SCRIPT_DIR, '..', 'Reports', 'assets');
 
 (async () => {
   console.log('\n🚀 Design Review Runner');
