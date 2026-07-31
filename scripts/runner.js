@@ -344,19 +344,27 @@ function findLocalBrowserPath() {
   console.log(`   Assets   : ${resolvedAssetsDir}`);
   console.log('─'.repeat(60));
 
+  // 智能识别 headless 模式：若设置 HEADLESS 环境变量或 Linux 容器无 Display 桌面环境时自动转为无头模式
+  const isHeadless = process.env.HEADLESS === 'true' || 
+                    (process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY);
+
   const launchOptions = {
-    headless: false,
-    slowMo: 150, // 增加每步延迟，便于用户肉眼跟随走查细节
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: isHeadless ? 'new' : false,
+    slowMo: isHeadless ? 0 : 150, // 有头模式保留 slowMo 方便肉眼观测，无头模式加速执行
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage' // 关键参数：防止 Docker 容器内 /dev/shm 内存限制导致 Chrome 崩溃
+    ]
   };
 
   // 本地浏览器内核识别：跨平台（macOS / Windows / Linux）自动探测 Chrome 或 Edge
   const localBrowser = findLocalBrowserPath();
   if (localBrowser) {
     launchOptions.executablePath = localBrowser.path;
-    console.log(`   Browser  : ${localBrowser.path} [${localBrowser.source}]`);
+    console.log(`   Browser  : ${localBrowser.path} [${localBrowser.source}] (Headless: ${isHeadless})`);
   } else {
-    console.log(`   Browser  : Puppeteer Default Bundled Chromium`);
+    console.log(`   Browser  : Puppeteer Default Bundled Chromium (Headless: ${isHeadless})`);
   }
 
   const browser = await puppeteer.launch(launchOptions);
