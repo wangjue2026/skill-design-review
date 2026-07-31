@@ -297,11 +297,25 @@ const resolvedAssetsDir = config.assets_dir
   console.log(`   Assets   : ${resolvedAssetsDir}`);
   console.log('─'.repeat(60));
 
-  const browser = await puppeteer.launch({
+  const launchOptions = {
     headless: false,
     slowMo: 150, // 增加每步延迟，便于用户肉眼跟随走查细节
     args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+  };
+
+  // 本地浏览器内核识别：优先环境变量，其次探测 macOS 本地 Google Chrome
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    console.log(`   Browser  : ${launchOptions.executablePath} (via Env)`);
+  } else {
+    const defaultMacChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    if (fs.existsSync(defaultMacChrome)) {
+      launchOptions.executablePath = defaultMacChrome;
+      console.log(`   Browser  : ${launchOptions.executablePath} (Auto-detected Local Chrome)`);
+    }
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   const page = await browser.newPage();
   const vp = config.viewport || { width: 1440, height: 900 };

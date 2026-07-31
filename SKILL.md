@@ -17,7 +17,7 @@ description: 对安全产品界面及原型进行深度 UI/UX 设计检视，支
 | 优先级 (Tier) | 执行路径 (Path) | 环境判定依据 | 规范动作 (Dos) | 严禁动作 (Don'ts) | 最终产出形式 |
 |:---|:---|:---|:---|:---|:---|
 | **Tier 1 (首选)** | **Path 1: 原生 Agent 浏览器模式** | Context 中包含具备浏览器渲染/探索/截图能力的工具（符合下方能力特征） | **直接快速调用原生浏览器工具**打开页面/URL，模拟角色走查探索，自动录屏/截图并打标分析 | **严禁**执行 `npm install`、`pip install` 或运行 CLI 脚本；严禁绕路下载 | 结构化 Markdown 报告 + 原生高清截图/录屏资产引用 |
-| **Tier 2 (次优)** | **Path 2: 本地 CLI / Node 脚本模式** | Context 中**无**原生浏览器工具，但具备 Terminal 执行权限（如 `run_command` / bash） | 检查并尝试安装脚本依赖（`npm install puppeteer`，**超时上限设为 2 分钟 / 120 秒**）；运行 `scripts/runner.js` 与 `scripts/report_builder.py` | 严禁卡死在依赖下载中超过 2 分钟；超时或失败必须立即中断并自动触发 Path 3 降级 | HTML 报告文件 + `Reports/assets/` 标注截图 |
+| **Tier 2 (次优)** | **Path 2: 本地 CLI / Node 脚本模式** | Context 中**无**原生浏览器工具，但具备 Terminal 执行权限（如 `run_command` / bash） | 跳过内核下载直接安装依赖（`PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer`），利用本地 Chrome (`runner.js` 自动探测)，运行脚本 | 严禁卡死在依赖下载中超过 2 分钟；超时或失败必须立即中断并自动触发 Path 3 降级 | HTML 报告文件 + `Reports/assets/` 标注截图 |
 | **Tier 3 (保底)** | **Path 3: 纯文本平台模式** | Tier 1 与 Tier 2 均无法实现（无浏览器工具、依赖安装超时/失败、云沙箱受限） | 自动平滑降级，基于 HTML/源码逻辑开展专业检视，并在报告头部**显式注明导致无法可视化的具体原因** | 严禁因无截图而降低检视深度；严禁输出无结构的流水账文字 | 结构化 Markdown 报告（头部含明确降级原因声明） |
 
 ---
@@ -63,9 +63,10 @@ AI 根据任务背景自适应选择最合适的检视视角（如：专家/小�
 ### 【Path 2 模式】本地 CLI / Node 自动化模式 (Local CLI/Puppeteer Mode)
 > 适用场景：无原生 Agent 浏览器工具，但具备 Terminal 执行权限且 Node.js/Python 环境可用。
 
-1. **依赖检查与 2 分钟超时防护**：
-   - 检查 `node_modules` 是否存在。若缺失，运行 `npm install puppeteer`，**设置严格超时阈值 2 分钟 (120s)**。
-   - 若依赖安装失败或超过 2 分钟未完成，**立即放弃 Path 2，自动切入 Path 3 纯文本平台模式**。
+1. **零内核下载快速安装与 2 分钟超时防护**：
+   - `scripts/runner.js` 已实现本地 Chrome 自动探测（自动匹配 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` 或 `PUPPETEER_EXECUTABLE_PATH`）。
+   - 安装依赖时必须使用跳过内核下载指令：`PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer`（通常 3 秒内完成）。
+   - 若依赖安装超过 2 分钟阈值，**立即放弃 Path 2，自动切入 Path 3 纯文本平台模式**。
 2. **执行走查与打标**：创建配置文件 `scripts/configs/<项目名>_review.json`，运行 `node scripts/runner.js scripts/configs/<项目名>_review.json`。
 3. **编译 HTML 报告**：创建问题清单 `scripts/configs/<项目名>_issues.json`，运行 `python3 scripts/report_builder.py scripts/configs/<项目名>_issues.json` 生成最终 HTML 报告于 `Reports/` 目录。
 
