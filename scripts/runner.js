@@ -289,6 +289,53 @@ const resolvedAssetsDir = config.assets_dir
   ? path.resolve(configDir, config.assets_dir)
   : path.resolve(SCRIPT_DIR, '..', 'Reports', 'assets');
 
+/**
+ * 自动探测跨平台 (macOS, Windows, Linux) 本地 Chrome 或 Edge 浏览器路径
+ */
+function findLocalBrowserPath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return { path: process.env.PUPPETEER_EXECUTABLE_PATH, source: 'Env PUPPETEER_EXECUTABLE_PATH' };
+  }
+
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const candidates = [];
+
+  if (isMac) {
+    candidates.push(
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary'
+    );
+  } else if (isWin) {
+    const pf = process.env['PROGRAMFILES'] || 'C:\\Program Files';
+    const pf86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
+    const local = process.env['LOCALAPPDATA'] || '';
+
+    candidates.push(
+      `${pf}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${pf86}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${local}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${pf86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`
+    );
+  } else {
+    candidates.push(
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    );
+  }
+
+  for (const item of candidates) {
+    if (item && fs.existsSync(item)) {
+      return { path: item, source: `Auto-detected (${process.platform})` };
+    }
+  }
+
+  return null;
+}
+
 (async () => {
   console.log('\n🚀 Design Review Runner');
   console.log(`   Project  : ${config.project || '未命名'}`);
@@ -303,16 +350,13 @@ const resolvedAssetsDir = config.assets_dir
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   };
 
-  // 本地浏览器内核识别：优先环境变量，其次探测 macOS 本地 Google Chrome
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    console.log(`   Browser  : ${launchOptions.executablePath} (via Env)`);
+  // 本地浏览器内核识别：跨平台（macOS / Windows / Linux）自动探测 Chrome 或 Edge
+  const localBrowser = findLocalBrowserPath();
+  if (localBrowser) {
+    launchOptions.executablePath = localBrowser.path;
+    console.log(`   Browser  : ${localBrowser.path} [${localBrowser.source}]`);
   } else {
-    const defaultMacChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    if (fs.existsSync(defaultMacChrome)) {
-      launchOptions.executablePath = defaultMacChrome;
-      console.log(`   Browser  : ${launchOptions.executablePath} (Auto-detected Local Chrome)`);
-    }
+    console.log(`   Browser  : Puppeteer Default Bundled Chromium`);
   }
 
   const browser = await puppeteer.launch(launchOptions);
