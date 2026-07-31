@@ -38,25 +38,16 @@
    pip install pillow
    ```
 
-## 🚀 标准工作流
+## 🚀 三阶环境自适应工作流 (3-Tier Adaptive Routing)
 
-按照以下两个步骤完成设计检视与报告生成：
+Skill 在启动时会自动校验 Agent 上下文环境，并智能选择最优执行路径：
 
-### Step 1: 执行页面走查并生成批注截图
-1. 参考 `scripts/configs/_template.json`，在 `scripts/configs/` 下为你的项目新建走查配置文件 `<项目名>_review.json`。
-2. 运行页面走查引擎，自动执行操作并对截图进行标注：
-   ```bash
-   node scripts/runner.js scripts/configs/<项目名>_review.json
-   ```
-   *生成的批注截图将自动输出到 `Reports/assets/` 目录。*
-
-### Step 2: 整理问题列表并生成 HTML 报告
-1. 参考 `scripts/configs/_template_issues.json`，在 `scripts/configs/` 下新建问题列表文件 `<项目名>_issues.json`，填入检视发现的问题、严重程度（P1-P4）以及改进建议。
-2. 运行报告生成器，生成最终的 HTML 报告：
-   ```bash
-   python3 scripts/report_builder.py scripts/configs/<项目名>_issues.json
-   ```
-   *生成的 HTML 报告将输出到 `Reports/<项目名>_设计检视报告_YYYYMMDD.html`。*
+1. **Path 1 (首选 - 原生 Agent 浏览器模式)**：
+   - 当 Agent 环境（如 Antigravity / DevTools MCP）自带 `browser_subagent` 或 DevTools 工具时，**直接唤起浏览器子进程**完成走查、截图、打标与录屏，无须安装任何本地依赖。
+2. **Path 2 (次优 - 本地 CLI 自动化模式)**：
+   - 若无原生浏览器工具但具备 Terminal 执行权限，自动检查并尝试安装 `puppeteer`（**2 分钟超时防护**），运行 `scripts/runner.js` 与 `scripts/report_builder.py` 生成 HTML 报告。
+3. **Path 3 (保底 - 纯文本平台模式)**：
+   - 若 Path 1 与 Path 2 均无法实现，平滑降级输出结构化 Markdown 报告，并在报告头部**显式注明未生成可视化的原因**。
 
 ---
 **Maintainer**: 体验设计团队 (UX Design Team)
