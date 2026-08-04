@@ -1,0 +1,72 @@
+{
+  "project": "DEM-数字体验监控系统",
+  "scenario": "首页与用户界面设计检视 (维度2 + 维度3)",
+  "persona": "网络与安全运维管理员 (10年+ 专家视角)",
+  "base_url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)",
+  "viewport": { "width": 1440, "height": 900 },
+  "assets_dir": "../../Reports/assets",
+
+  "steps": [
+    {
+      "name": "DEM 首页全景与体验问题告警卡片",
+      "actions": [
+        { "type": "navigate", "url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)/DEM-首页.html" },
+        { "type": "wait", "ms": 1000 }
+      ],
+      "screenshot": {
+        "file": "01_dem_home_overview.png",
+        "annotations": [
+          {
+            "selector": "css:.dem-alert-card",
+            "label": "[P2-较重] 拓扑节点明确定位但缺失一键处置动作入口",
+            "color": "orange"
+          },
+          {
+            "selector": "css:.dem-select",
+            "label": "[P2-较重] 告警筛选后状态下钻返回重置",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DEM 首页唤起 AI Agent 智能排障抽屉",
+      "actions": [
+        { "type": "click", "selector": "text/查看详情" },
+        { "type": "wait", "ms": 800 }
+      ],
+      "screenshot": {
+        "file": "02_dem_ai_drawer.png",
+        "annotations": [
+          {
+            "selector": "text/查看详细分析链与逻辑举证",
+            "label": "[P1-严重] 二级抽屉完全遮挡主对话上下文",
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DEM 用户访问体验看板",
+      "actions": [
+        { "type": "navigate", "url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)/DEM-用户.html" },
+        { "type": "wait", "ms": 1000 }
+      ],
+      "screenshot": {
+        "file": "03_dem_user_page.png",
+        "annotations": [
+          {
+            "selector": "css:.dem-table-container",
+            "label": "[P2-较重] 体验受阻人次缺乏受影响人数交叉分析且单位缺空格",
+            "color": "orange"
+          },
+          {
+            "selector": "css:table.dem-table td:nth-child(4)",
+            "label": "[P3-轻微] IP归属地与POP节点技术工程化词汇残留",
+            "color": "yellow"
+          }
+        ]
+      }
+    }
+  ]
+}
