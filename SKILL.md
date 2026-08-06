@@ -1,6 +1,6 @@
 ---
 name: design-review
-description: 对安全产品界面及原型进行深度 UI/UX 设计检视，支持原生 Agent 浏览器模式、本地 CLI 自动化脚本模式及纯文本平台降级模式，输出包含问题定级 (P1-P4)、评分、改进建议与三段式结论的专业报告。
+description: 对安全产品界面及原型进行深度 UI/UX 设计检视，支持 Agent 浏览器交互走查模式与源码静态分析降级模式，输出包含问题定级 (P1-P4)、评分、改进建议与三段式结论的专业报告。
 ---
 
 # 技能：安全产品设计检视 (Design Review)
@@ -10,23 +10,22 @@ description: 对安全产品界面及原型进行深度 UI/UX 设计检视，支
 
 ---
 
-## 0. 执行路径选择：Agent 工具链自适应路由协议 (Adaptive Routing Protocol)
+## 0. 执行路径选择：Agent 工具链路由协议 (Agent Routing Protocol)
 
-在收到任何设计检视指令后，AI **必须第一时间内检查当前 Agent 运行环境中的 Context 与可用工具声明**，并严格按照以下优先级决定执行路径。**绝对禁止死板套用单一固化路径**：
+在收到任何设计检视指令后，AI **必须第一时间内检查当前 Agent 运行环境中的 Context 与可用工具声明**，并决定执行路径：
 
 | 优先级 (Tier) | 执行路径 (Path) | 环境判定依据 | 规范动作 (Dos) | 严禁动作 (Don'ts) | 最终产出形式 |
 |:---|:---|:---|:---|:---|:---|
-| **Tier 1 (首选)** | **Path 1: 原生 Agent 浏览器模式** | Context 中包含具备浏览器渲染/探索/截图能力的工具（符合下方能力特征） | **直接快速调用原生浏览器工具**打开页面/URL，模拟角色走查探索，自动录屏/截图并打标分析 | **严禁**执行 `npm install`、`pip install` 或运行 CLI 脚本；严禁绕路下载 | 结构化 Markdown 报告 + 原生高清截图/录屏资产引用 |
-| **Tier 2 (次优)** | **Path 2: 本地 CLI / Node 脚本模式** | Context 中**无**原生浏览器工具，但具备 Terminal 执行权限（如 `run_command` / bash） | 跳过内核下载直接安装依赖（`PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer`），利用本地 Chrome (`runner.js` 自动探测)，运行脚本 | 严禁卡死在依赖下载中超过 2 分钟；超时或失败必须立即中断并自动触发 Path 3 降级 | HTML 报告文件 + `Reports/assets/` 标注截图 |
-| **Tier 3 (保底)** | **Path 3: 纯文本平台模式** | Tier 1 与 Tier 2 均无法实现（无浏览器工具、依赖安装超时/失败、云沙箱受限） | 自动平滑降级，基于 HTML/源码逻辑开展专业检视，并在报告头部**显式注明导致无法可视化的具体原因** | 严禁因无截图而降低检视深度；严禁输出无结构的流水账文字 | 结构化 Markdown 报告（头部含明确降级原因声明） |
+| **Tier 1 (主模式)** | **Path 1: Agent 浏览器探索走查模式** | Context 包含原生浏览器工具（`browser_subagent` / `chrome_devtools` 等），或具备命令行执行能力 | **优先直接调用原生工具**；若无原生工具，AI 自动在终端执行 `npm install -g agent-browser` 获取通用浏览器能力，再通过自然语言驱动走查 | **严禁**在 Skill 中编写硬编码的 Puppeteer/Selenium 项目业务脚本；统一通过通用的 Agent-Browser 工具链操作 | 结构化 Markdown 报告 + 高清截图/录屏资产引用 |
+| **Tier 2 (降级模式)** | **Path 2: 源码静态分析模式** | Context 中**无**任何浏览器工具（极少数受限容器/纯命令行环境） | 平滑降级，基于 HTML/Vue/JS 静态源码逻辑开展专业体验审查，并在报告头部**显式注明降级原因** | 严禁因无截图而降低检视深度；严禁输出无结构的流水账文字 | 结构化 Markdown 报告（头部含明确降级原因声明） |
 
 ---
 
-### 🔍 0.1 浏览器自动化能力识别标准 (Capability Recognition Standard)
+### 🔍 0.1 浏览器能力识别标准 (Capability Recognition Standard)
 
 AI **绝对不能机械地仅匹配 `browser_subagent` 字符串**，而是必须对当前 Context 中声明的所有 API / 工具进行**能力语义匹配 (Capability Semantic Matching)**。只要满足以下**任意一条**特征，即判定拥有 Tier 1 浏览器能力：
 
-1. **命名/描述语义特征**：工具名称或描述中包含 `browser` / `subagent` / `chrome` / `devtools` / `playwright` / `puppeteer` / `web_page` 等关键词（例如：`browser_subagent`、`chrome_devtools`、`playwright_navigate` 等）。
+1. **命名/描述语义特征**：工具名称或描述中包含 `agent-browser` / `browser` / `subagent` / `chrome` / `devtools` / `playwright` / `puppeteer` / `web_page` 等关键词。
 2. **核心 API 组合识别**：工具链支持“页面加载 (`navigate`/`open_url`) + 视觉快照/截图 (`screenshot`/`capture`/`read_page`) + 页面交互 (`click`/`type`)”。
 3. **MCP 协议服务注册**：当前 Agent 上下文绑定了 Chrome DevTools MCP Server、Playwright MCP Server 或其他等效的 Web 浏览器控制 MCP 节点。
 
@@ -40,8 +39,6 @@ AI **绝对不能机械地仅匹配 `browser_subagent` 字符串**，而是必�
 2. **旨在解决用户的什么核心问题/痛点**（用户在旧流程中有何困难，本设计试图解决什么）。
 
 > 🛑 **拦截规程**：若用户未在初始指令中告知需求背景及解决的核心问题，AI **必须暂停向下选择维度，主动触发前置拦截**，反问提示：“为了保证检视精准度，请先补充告知：1. 本界面的需求背景是什么？ 2. 本设计旨在解决用户的什么核心痛点？”。若用户已提供，直接进入 Step 1.1，严禁重复拦截。
-
----
 
 ### 步骤 1.1: 检视维度确认与 [维度 1] 剧本双重拦截
 向用户确认本次检视需要执行的维度（支持多选）：
@@ -63,33 +60,23 @@ AI 根据任务背景与 Step 1.0 的需求定义，自适应选择最合适的�
 
 ## 2. 路径具体执行规程 (Path Operational Guides)
 
-### 【Path 1 模式】原生 Agent 浏览器模式 (Native Agent Browser Mode)
-> 适用场景：Agent 环境（如 Antigravity、Chrome-DevTools 插件、Playwright MCP 等）包含浏览器工具链。
+### 【Path 1 主模式】Agent 浏览器探索走查模式 (Agent Browser Mode)
+> 适用场景：包含原生浏览器工具（如 Antigravity、Chrome-DevTools MCP）或可运行命令行的环境。
 
-1. **快速唤起子进程/浏览器工具**：直接调用匹配到的浏览器工具（如 `browser_subagent`、`chrome_devtools` 等），传入待检视的本地 HTML 文件路径（`file:///...`）或 Web URL。
-2. **角色剧本走查与录屏截图**：由浏览器子进程按测试角色模拟真实交互（点击、下钻、展开弹窗），自动捕获上下文截图与交互过程录屏。
-3. **实时 DOM 与视觉审查**：结合子进程返回的渲染 DOM 与视觉快照，完成 Checklist 深度分析与定位。
-4. **生成 Markdown 报告**：在对话中直接输出结构化 Markdown 检视报告（并在**报告最下方附带问题等级定性解释表**）。
-
----
-
-### 【Path 2 模式】本地 CLI / Node 自动化模式 (Local CLI/Puppeteer Mode)
-> 适用场景：无原生 Agent 浏览器工具，但具备 Terminal 执行权限且 Node.js/Python 环境可用。
-
-1. **零内核下载快速安装与 2 分钟超时防护**：
-   - `scripts/runner.js` 已实现跨平台 (macOS/Windows/Linux) 本地 Chrome/Edge 自动探测。
-   - 安装依赖使用跳过内核下载指令：`PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer`。
-   - 若依赖安装超过 2 分钟阈值，**立即放弃 Path 2，自动切入 Path 3 纯文本平台模式**。
-2. **执行走查与打标**：创建配置文件 `scripts/configs/<项目名>_review.json`，运行 `node scripts/runner.js scripts/configs/<项目名>_review.json`。
-3. **编译 HTML 报告**：创建问题清单 `scripts/configs/<项目名>_issues.json`，运行 `python3 scripts/report_builder.py scripts/configs/<项目名>_issues.json` 生成 HTML 报告于 `Reports/` 目录（**报告最下方已内置问题等级定性解释表**）。
+1. **环境判断与工具准备**：
+   - **分支 1A (原生内置型)**：若 Context 已声明 `browser_subagent`、`chrome_devtools` 等原生工具（如 Antigravity / Codex），直接唤起使用，无需安装任何依赖。
+   - **分支 1B (按需安装型)**：若 Context **无**原生浏览器工具但具备命令行权限，AI 自动在终端执行全局安装通用的浏览器 Agent 工具（例如：`npm install -g agent-browser`），安装完成后通过该通用工具进行自然语言操控。
+2. **自然语言探索与走查**：以测试角色视角，通过自然语言操控浏览器工具模拟真实操作链路（如“点击顶部筛选栏”、“切换至体验预警页”、“展开诊断详情 Drawer”）。
+3. **捕捉快照与上下文分析**：由浏览器工具自动捕获页面视觉快照与渲染 DOM，AI 结合实时快照与 Checklist 规范进行分析与定级。
+4. **生成 Markdown 报告**：在对话中输出结构化 Markdown 检视报告（报告头部引用快照，**最下方附带问题等级定性解释表**）。
 
 ---
 
-### 【Path 3 模式】纯文本平台模式 (Pure Platform Markdown Mode)
-> 适用场景：Path 1 与 Path 2 均无法实现（无浏览器工具且脚本环境不可用/超时/受限）。
+### 【Path 2 降级模式】源码静态分析模式 (Static Code Analysis Mode)
+> 适用场景：极少数无任何浏览器控制工具的受限环境。
 
-1. **源码与原型分析**：平滑降级，基于 HTML/原型代码进行专业体验审查，分析质量与可视化模式保持一致。
-2. **结构化报告输出**：在对话中直接输出结构化 Markdown 报告（头部含降级原因，**最下方附带问题等级定性解释表**）。
+1. **源码静态分析**：平滑降级，基于 HTML/Vue 原型代码结构直接进行 UI/UX 体验审查。
+2. **结构化报告输出**：在对话中输出结构化 Markdown 报告（头部显式声明降级原因，**最下方附带问题等级定性解释表**）。
 
 ---
 
