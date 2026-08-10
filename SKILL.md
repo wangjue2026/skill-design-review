@@ -64,7 +64,7 @@ AI 根据任务背景与 Step 1.0 的需求定义，自适应选择最合适的�
 > 适用场景：包含原生浏览器工具（如 Antigravity、Chrome-DevTools MCP）或可运行命令行的环境。
 
 1. **环境判断与工具准备**：
-   - **分支 1A (原生内置型)**：若 Context 已声明 `browser_subagent`、`chrome_devtools` 等原生工具（如 Antigravity / Codex），直接唤起使用，无需安装任何依赖。
+   - **分支 1A (原生内置型)**：若 Context 已声明 `browser_subagent`、`chrome_devtools`、`agent_browser` 等原生工具（如 Antigravity / Codex），直接唤起使用，无需安装任何依赖。
    - **分支 1B (按需安装型)**：若 Context **无**原生浏览器工具但具备命令行权限，AI 自动在终端执行全局安装通用的浏览器 Agent 工具（例如：`npm install -g agent-browser`），安装完成后通过该通用工具进行自然语言操控。
 2. **自然语言探索与走查**：以测试角色视角，通过自然语言操控浏览器工具模拟真实操作链路（如“点击顶部筛选栏”、“切换至体验预警页”、“展开诊断详情 Drawer”）。
 3. **捕捉快照与上下文分析**：由浏览器工具自动捕获页面视觉快照与渲染 DOM，AI 结合实时快照与 Checklist 规范进行分析与定级。
