@@ -1,0 +1,141 @@
+{
+  "project": "全球加速 POP管理与隧道管理",
+  "base_url": "http://ui.sangfor.com.cn/s/etwi8H8JcR/#",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "assets_dir": "../../Reports/assets",
+  "steps": [
+    {
+      "name": "进入 POP 节点管理页面",
+      "actions": [
+        {
+          "type": "navigate",
+          "url": "http://ui.sangfor.com.cn/s/etwi8H8JcR/#/globalAcceleration/popNodeManagement"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        }
+      ],
+      "screenshot": {
+        "file": "pop_tunnel_01_pop_management.png",
+        "annotations": [
+          {
+            "selector": "text/POP节点总数",
+            "label": "概览统计：可看但缺少下钻解释",
+            "color": "orange"
+          },
+          {
+            "selector": "text/POP列表",
+            "label": "POP树与表格上下文关联需增强",
+            "color": "blue"
+          },
+          {
+            "selector": "text/新增PE",
+            "label": "操作入口集中但层级偏密",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "打开页面说明面板",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "text/页面说明"
+        },
+        {
+          "type": "wait",
+          "ms": 1000
+        }
+      ],
+      "screenshot": {
+        "file": "pop_tunnel_02_pop_page_doc.png",
+        "annotations": [
+          {
+            "selector": "text/POP 管理汇总页",
+            "label": "页面说明覆盖 POP 管理完整结构",
+            "color": "green"
+          },
+          {
+            "selector": "text/新增 / 编辑 PE 抽屉",
+            "label": "复杂配置建议强化影响范围与防错",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "在页面说明中切换到隧道管理说明",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "text/隧道管理"
+        },
+        {
+          "type": "wait",
+          "ms": 1000
+        }
+      ],
+      "screenshot": {
+        "file": "pop_tunnel_03_tunnel_page_doc.png",
+        "annotations": [
+          {
+            "selector": "text/隧道管理列表页",
+            "label": "隧道管理结构：筛选 + 表格 + 抽屉/弹窗",
+            "color": "green"
+          },
+          {
+            "selector": "text/查询范围",
+            "label": "筛选偏字段导向，建议增加排障导向快捷视图",
+            "color": "orange"
+          },
+          {
+            "selector": "text/批量编辑弹窗",
+            "label": "批量配置需展示影响范围和变更前后对比",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "关闭说明并尝试进入隧道管理真实页面",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "css:.se-dialog__headerbtn, .el-dialog__headerbtn, [aria-label='Close']"
+        },
+        {
+          "type": "wait",
+          "ms": 800
+        },
+        {
+          "type": "click",
+          "selector": "text/隧道管理"
+        },
+        {
+          "type": "wait",
+          "ms": 1800
+        }
+      ],
+      "screenshot": {
+        "file": "pop_tunnel_04_tunnel_login_redirect.png",
+        "annotations": [
+          {
+            "selector": "text/欢迎登录",
+            "label": "跨模块切换被重定向至登录页，任务连续性中断",
+            "color": "red"
+          },
+          {
+            "selector": "text/开始验证",
+            "label": "登录验证阻断后续隧道管理走查",
+            "color": "orange"
+          }
+        ]
+      }
+    }
+  ]
+}

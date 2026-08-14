@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模拟设计检视报告 (模板效果调优预览)</title>
+    <style>
+        :root {
+            --bg-color: #0b0e14;
+            --card-bg: #161b22;
+            --accent-primary: #3fb950;
+            --accent-warning: #d29922;
+            --accent-error: #f85149;
+            --accent-info: #3a86ff;
+            --accent-dim: #8338ec;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --border-color: #30363d;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        .header-info h1 {
+            margin: 0;
+            font-size: 28px;
+            background: linear-gradient(90deg, #fff, #8b949e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+
+        .header-info p {
+            color: var(--text-dim);
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
+
+        .score-badge {
+            background: var(--card-bg);
+            border: 1px solid var(--accent-warning);
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(210, 153, 34, 0.15);
+        }
+
+        .score-badge .label {
+            display: block;
+            font-size: 12px;
+            color: var(--accent-warning);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .score-badge .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--text-dim);
+        }
+
+        .summary-card .count {
+            font-size: 36px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .summary-card.p1 .count { color: var(--accent-error); }
+        .summary-card.p2 .count { color: var(--accent-warning); }
+        .summary-card.p3 .count { color: var(--accent-primary); }
+        .summary-card.p4 .count { color: var(--text-dim); }
+
+        .conclusion-section {
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+
+        .conclusion-section h2 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent-info);
+            padding-left: 10px;
+        }
+
+        .conclusion-table-wrapper {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .conclusion-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        .conclusion-table th {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            padding: 12px 14px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .conclusion-table td {
+            padding: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            vertical-align: middle;
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .conclusion-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .conclusion-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .dimension-name {
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        .dimension-intent {
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .dimension-content {
+            font-size: 12px;
+            color: var(--text-main);
+        }
+
+        .dimension-notes {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .dimension-result {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .result-pass {
+            background: rgba(63, 185, 80, 0.12);
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+        }
+
+        .result-warning {
+            background: rgba(210, 153, 34, 0.12);
+            color: var(--accent-warning);
+            border: 1px solid var(--accent-warning);
+        }
+
+        .result-fail {
+            background: rgba(248, 81, 73, 0.12);
+            color: var(--accent-error);
+            border: 1px solid var(--accent-error);
+        }
+
+        .issue-count-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .issue-count-zero {
+            color: var(--text-dim);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .issue-count-has {
+            color: var(--accent-warning);
+            background: rgba(210, 153, 34, 0.15);
+            border: 1px solid rgba(210, 153, 34, 0.4);
+        }
+
+        .issue-section {
+            margin-top: 60px;
+        }
+
+        .issue-section > h2 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent-error);
+            padding-left: 10px;
+        }
+
+        .issue-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 30px;
+            padding: 30px;
+        }
+
+        .issue-evidence-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: stretch;
+            margin: 18px 0 0 0;
+        }
+
+        .issue-evidence-media,
+        .issue-detail-panel {
+            min-width: 0;
+        }
+
+        /* 统一占位图容器（当维度4代码审查等确实无法取图时保持双栏布局一致性） */
+        .issue-img-placeholder {
+            width: 100%;
+            min-height: 260px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-dim);
+            font-size: 13px;
+            padding: 24px;
+            box-sizing: border-box;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .issue-img-placeholder svg {
+            width: 32px;
+            height: 32px;
+            opacity: 0.4;
+            fill: var(--text-dim);
+        }
+
+        .issue-img-placeholder .placeholder-tip {
+            font-size: 12px;
+            color: var(--text-dim);
+            opacity: 0.7;
+        }
+
+        .issue-img-wrapper {
+            background: #000;
+            cursor: zoom-in;
+            position: relative;
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 0 0 10px 0;
+        }
+
+        .issue-img-wrapper img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: contain;
+            transition: transform 0.2s;
+        }
+
+        .issue-img-wrapper:hover img {
+            transform: scale(1.01);
+        }
+
+        .image-caption {
+            color: var(--text-dim);
+            font-size: 12px;
+            line-height: 1.7;
+            margin: 0;
+        }
+
+        .issue-detail-panel {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .tag-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .issue-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .tag-p1 { background: rgba(248, 81, 73, 0.1); color: var(--accent-error); border: 1px solid var(--accent-error); }
+        .tag-p2 { background: rgba(210, 153, 34, 0.1); color: var(--accent-warning); border: 1px solid var(--accent-warning); }
+        .tag-p3 { background: rgba(63, 185, 80, 0.1); color: var(--accent-primary); border: 1px solid var(--accent-primary); }
+        .tag-p4 { background: rgba(139, 148, 158, 0.1); color: var(--text-dim); border: 1px solid var(--text-dim); }
+        
+        .tag-scenario { background: rgba(58, 134, 255, 0.1); color: var(--accent-info); border: 1px solid var(--accent-info); }
+        .tag-dimension { background: rgba(131, 56, 236, 0.1); color: var(--accent-dim); border: 1px solid var(--accent-dim); }
+        .tag-confidence { background: rgba(255, 255, 255, 0.06); color: var(--text-main); border: 1px solid var(--border-color); }
+
+        .issue-title {
+            font-size: 20px;
+            margin: 0 0 15px 0;
+            color: #fff;
+        }
+
+        .issue-field {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .issue-field h4 {
+            margin: 0 0 6px 0;
+            color: #fff;
+            font-size: 13px;
+        }
+
+        .issue-field p,
+        .issue-field ul,
+        .issue-field ol {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .issue-field ul,
+        .issue-field ol {
+            padding-left: 18px;
+        }
+
+        .solution-box {
+            background: rgba(63, 185, 80, 0.05);
+            border-left: 4px solid var(--accent-primary);
+            padding: 12px 14px;
+            border-radius: 4px;
+        }
+
+        .solution-box h4 {
+            margin: 0 0 6px 0;
+            color: var(--accent-primary);
+            font-size: 13px;
+        }
+
+        .solution-box p,
+        .solution-box ul {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .hypothesis-section {
+            margin-top: 50px;
+            margin-bottom: 40px;
+        }
+
+        .hypothesis-section h2 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--text-dim);
+            padding-left: 10px;
+        }
+
+        .hypothesis-box {
+            background: rgba(139, 148, 158, 0.06);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+        }
+
+        .hypothesis-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .hypothesis-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .hypothesis-title {
+            color: #fff;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+        }
+
+        .scoring-rules {
+            margin-top: 80px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 40px;
+        }
+
+        .scoring-rules h2 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .rules-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .rules-table th, .rules-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .rules-table th {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+            .issue-evidence-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        #lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+        }
+
+        #lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-info">
+                <h1>全球加速后台设计检视模拟报告 (效果调优版)</h1>
+                <p>检视场景：POP 节点与隧道拓扑管理 | 测试角色：骨干网运维工程师 | 日期：2026-08-14</p>
+            </div>
+            <div class="score-badge">
+                <span class="label">体验评分</span>
+                <span class="value">76.0</span>
+            </div>
+        </header>
+
+        <!-- 问题汇总看板 -->
+        <section class="summary-grid">
+            <div class="summary-card p1">
+                <span class="count">0</span>
+                <span class="label">严重问题 (P1)</span>
+            </div>
+            <div class="summary-card p2">
+                <span class="count">3</span>
+                <span class="label">较重问题 (P2)</span>
+            </div>
+            <div class="summary-card p3">
+                <span class="count">4</span>
+                <span class="label">轻微问题 (P3)</span>
+            </div>
+            <div class="summary-card p4">
+                <span class="count">2</span>
+                <span class="label">体验瑕疵 (P4)</span>
+            </div>
+        </section>
+
+        <!-- 四大维度检视定性结论 -->
+        <section class="conclusion-section">
+            <h2>四大维度检视定性结论</h2>
+            <div class="conclusion-table-wrapper">
+                <table class="conclusion-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 14%;">检视维度</th>
+                            <th style="width: 17%;">检视意图</th>
+                            <th style="width: 26%;">AI执行检视内容</th>
+                            <th style="width: 11%; text-align: center;">AI检视结论</th>
+                            <th style="width: 9%; text-align: center;">问题数</th>
+                            <th style="width: 23%;">备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 维度 1 -->
+                        <tr>
+                            <td class="dimension-name">维度 1：体验目标达成</td>
+                            <td class="dimension-intent">验证核心用户主任务剧本的通畅度与体验目标闭环</td>
+                            <td class="dimension-content">执行【华东POP关联备用PE】与【跨国隧道升级】剧本测试，判断是否达成“高危变更极速闭环且零认知摩擦”体验目标</td>
+                            <td style="text-align: center;">
+                                <span class="dimension-result result-warning">基础达成</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="issue-count-tag issue-count-has">1个 P2</span>
+                            </td>
+                            <td class="dimension-notes">主干配置链路可走通，但 PE 抽屉保存后父页面列表缺乏乐观高亮反馈，诱发二次刷新摩擦。</td>
+                        </tr>
+                        <!-- 维度 2 -->
+                        <tr>
+                            <td class="dimension-name">维度 2：产品理念契合度</td>
+                            <td class="dimension-intent">评估方案与产品愿景、品牌内核及更高维解法的契合度</td>
+                            <td class="dimension-content">理解 SD-WAN 骨干网运维背景，结合走查测试，评估是否存在更高维的需求与设计解法（如主动预警与全局一眼透视指标）</td>
+                            <td style="text-align: center;">
+                                <span class="dimension-result result-warning">部分符合</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="issue-count-tag issue-count-has">1个 P2</span>
+                            </td>
+                            <td class="dimension-notes">健康状态缺乏 Glanceable 聚合透视指示，隧道密钥套件切换缺乏向下握手兼容性前置校验提示。</td>
+                        </tr>
+                        <!-- 维度 3 -->
+                        <tr>
+                            <td class="dimension-name">维度 3：常规交互Checklist</td>
+                            <td class="dimension-intent">排查通用 UX 交互原则、表单校验、防错及状态反馈合规性</td>
+                            <td class="dimension-content">匹配 Checklist 中表单行内校验、二次确认防错、操作按钮防重与抽屉关闭响应等子维度，完成交互合规性检视</td>
+                            <td style="text-align: center;">
+                                <span class="dimension-result result-pass">通过</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="issue-count-tag issue-count-has">1个 P3</span>
+                            </td>
+                            <td class="dimension-notes">抽屉交互、表单基础校验与操作防重均合规；仅批量停用操作确认弹窗的量化影响说明不够具体。</td>
+                        </tr>
+                        <!-- 维度 4 -->
+                        <tr>
+                            <td class="dimension-name">维度 4：方案完备性检视</td>
+                            <td class="dimension-intent">扫描全状态矩阵、极端临界数据与环境自适应能力</td>
+                            <td class="dimension-content">对全量 demo 与原型代码进行全状态（空白态/加载骨架屏/报错拦截/极端长文本截断）交互场景和细节扫描检查</td>
+                            <td style="text-align: center;">
+                                <span class="dimension-result result-warning">完备性不足</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="issue-count-tag issue-count-has">1个 P2, 1个 P3</span>
+                            </td>
+                            <td class="dimension-notes">扫描识别到 2 处缺漏：① 极端超长链路命名未做 Tooltip 截断挤爆操作列；② 首次无数据时缺乏情境化空状态引导。</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 正式问题清单 -->
+        <div class="issue-section">
+            <h2>正式发现问题清单 (通过任务实证准入)</h2>
+
+            <!-- ISSUE 1 (P2 - 维度 1) -->
+            <div class="issue-card">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">POP 节点管理</span>
+                    <span class="issue-tag tag-dimension">维度 1：体验目标达成</span>
+                    <span class="issue-tag tag-p2">P2 (较重)</span>
+                    <span class="issue-tag tag-confidence">实证成立</span>
+                </div>
+                <h3 class="issue-title">PE 关联配置抽屉在提交成功后未同步更新列表联动高亮，导致运维人员需手动全局刷新确认</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        <div class="issue-img-wrapper" onclick="openLightbox('assets/pop_add_pe_drawer_review.png')">
+                            <img src="assets/pop_add_pe_drawer_review.png" alt="PE 关联抽屉检视截图">
+                        </div>
+                        <p class="image-caption">图 1：关联 PE 节点保存后，底层表格未给出即时状态渐变提示，抽屉关闭动画与列表存在 1.2s 视觉停滞</p>
+                    </div>
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>向华东-杭州骨干 POP 节点新增并关联 2 台备用 PE 路由设备，并确认其在线状态。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径</h4>
+                            <p>在 POP 列表操作列点击【关联 PE】&rarr; 展开右侧抽屉 &rarr; 填写 IP/掩码并勾选主备策略 &rarr; 点击【确认保存】。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>可手动点击列表右上角的【刷新】图标重新拉取，但该操作会丢失当前翻页页码与聚焦行。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>抽屉关闭后父页面列表缺乏乐观更新反馈，目标行无高亮闪烁过渡，运维工程师无法在首屏直观判断下发指令是否已被后端生效收敛。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>在高危变更时段容易诱发运维人员误以为指令未送达而发生“二次重复点击”，增加配置冲突风险。</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>抽屉关闭后对表格关联行施加 2 秒的主题色柔和高亮动效，并在行首打上“刚刚更新”的小徽标，保持上下文闭环。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ISSUE 2 (P2 - 维度 2) -->
+            <div class="issue-card">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">隧道拓扑管理</span>
+                    <span class="issue-tag tag-dimension">维度 2：产品理念契合度</span>
+                    <span class="issue-tag tag-p2">P2 (较重)</span>
+                    <span class="issue-tag tag-confidence">实证成立</span>
+                </div>
+                <h3 class="issue-title">隧道编辑抽屉中主备加密套件切换未提供向下兼容性校验警示</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        <div class="issue-img-wrapper" onclick="openLightbox('assets/tunnel_edit_drawer_review.png')">
+                            <img src="assets/tunnel_edit_drawer_review.png" alt="隧道配置编辑抽屉截图">
+                        </div>
+                        <p class="image-caption">图 2：编辑 IPsec 密钥套件时，未联动提示对端节点固件版本支持度，缺乏高危配置防错前置引导</p>
+                    </div>
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>对跨国骨干链路隧道进行加密等级升级（从 AES-128 平滑切换为 ChaCha20-Poly1305）。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径</h4>
+                            <p>在隧道拓扑列表中选中目标隧道 &rarr; 点击【配置编辑】抽屉 &rarr; 修改【加密算法】下拉项 &rarr; 点击保存。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>需先退回到设备管理大盘，手动搜索对端边缘路由固件版本，再切回隧道管理页面，跨模块跳转成本极高。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>安全策略变更属于影响全网连通性的高危动作，表单缺少对端版本握手能力的前置提示与兼容性检查横幅。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>若对端老旧硬件不支持新算法，保存后会导致业务隧道瞬断数十秒，违反网络变更平滑保障原则。</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>在下拉选项旁边增加动态兼容性检查胶囊标签（如“对端支持”/“对端版本过低需协商”），并在提交前提供链路影响预估确认弹窗。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ISSUE 3 (P3 - 维度 3) -->
+            <div class="issue-card">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">POP 节点管理</span>
+                    <span class="issue-tag tag-dimension">维度 3：常规交互Checklist</span>
+                    <span class="issue-tag tag-p3">P3 (轻微)</span>
+                    <span class="issue-tag tag-confidence">实证成立</span>
+                </div>
+                <h3 class="issue-title">POP 节点列表批量停用操作的警告弹窗文案不够具体，未明确列出受影响的下游承载业务量</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        <div class="issue-img-wrapper" onclick="openLightbox('assets/pop_node_management_review.png')">
+                            <img src="assets/pop_node_management_review.png" alt="POP 节点管理大盘截图">
+                        </div>
+                        <p class="image-caption">图 3：节点多选后点击【批量维护/下线】，二次确认弹窗仅有通用定性文案，缺乏定量受影响隧道计数</p>
+                    </div>
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>维护时段批量将 3 个老旧 POP 节点置为“维护隔离”状态。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径</h4>
+                            <p>勾选表格行 &rarr; 顶部批量操作栏点击【停用】 &rarr; 观察确认弹框提示信息。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>需逐个进入 3 个节点的详情抽屉，手动口算其承载的活跃隧道总数。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>防错弹窗提示为“确定要停用所选 3 个节点吗？”，缺少关键量化影响说明（如“涉及 14 条活跃隧道、预估 2.3Gbps 流量需自动重路由”）。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>增加了运维负责人的心理负担和复核时间，容易因信息透明度不足而延误维护窗口期。</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>弹窗内集成轻量影响清单：“所选 3 个节点共承载 14 条隧道（其中 2 条无备用路由），确认自动切换？”，提升决策透明度。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ISSUE 4 (P2 - 维度 4：极端临界数据态) -->
+            <div class="issue-card">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">隧道拓扑管理</span>
+                    <span class="issue-tag tag-dimension">维度 4：方案完备性检视</span>
+                    <span class="issue-tag tag-p2">P2 (较重)</span>
+                    <span class="issue-tag tag-confidence">实证成立</span>
+                </div>
+                <h3 class="issue-title">【极端临界数据态】超长隧道链路标识（>35字符）未设置文本截断气泡，导致表格右侧操作列被挤出屏幕视口</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        <div class="issue-img-wrapper" onclick="openLightbox('assets/tunnel_management_review.png')">
+                            <img src="assets/tunnel_management_review.png" alt="极端长文本截断缺失截图">
+                        </div>
+                        <p class="image-caption">图 4：当对端地域命名为“AP-SOUTHEAST-SINGAPORE-AZ02-BACKBONE-PRI”时，列宽无限撑开导致操作按钮需水平滚动 400px 方可触达</p>
+                    </div>
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>在 1440x900 标准分辨率下，快速查看多地域跨国混合隧道并执行单行诊断操作。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径</h4>
+                            <p>加载包含长命名的跨国专线测试数据 &rarr; 浏览表格右侧操作列 &rarr; 发现视口内无法直接看到【诊断】与【编辑】按钮。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>必须将鼠标移至表格底部横向滚动条拖拽至最右端，或者缩小浏览器整体缩放比例至 75%。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>根据《方案完备性检视 5. 极端临界数据态》，表格列未设置自适应最大宽度限制与溢出文本气泡（Tooltip），多字符长文本直接破坏了表格容器的弹性栅格布局。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>高频网络告警处置场景下，运维人员每次操作均需反复拖拽横向滚动条，严重拖慢单点故障恢复效率。</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>对“隧道名称”、“对端 PE 标识”列设定固定最大宽度（如 240px），开启单行省略截断 `...`，并在 Hover 时弹出完整名称浮层气泡；同时将最右侧【操作】列固定（Fixed Right）。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ISSUE 5 (P3 - 维度 4：零数据空白态 · 无实际截图时的统一双栏占位示例) -->
+            <div class="issue-card">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">POP 节点管理</span>
+                    <span class="issue-tag tag-dimension">维度 4：方案完备性检视</span>
+                    <span class="issue-tag tag-p3">P3 (轻微)</span>
+                    <span class="issue-tag tag-confidence">代码静态审查 · 状态未定义</span>
+                </div>
+                <h3 class="issue-title">【空白/零数据态】新租户首次进入或地域筛选无数据时仅显示裸表头，缺乏情境化引导插槽</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        <div class="issue-img-placeholder">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                            <div>
+                                <strong>截图未获取或此问题关联界面不存在</strong>
+                                <div class="placeholder-tip">代码静态审查发现 · 状态插槽未定义</div>
+                            </div>
+                        </div>
+                        <p class="image-caption">说明：经源码静态检视，该状态组件在原型中未被定义或未提供独立渲染视图</p>
+                    </div>
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>新开通租户首次初始化网络拓扑，或运维人员在特定未覆盖地域下检索可用 POP 资源。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径（代码静态检视）</h4>
+                            <p>扫描 POP 节点表格与抽屉组件的源码结构，排查 `empty` 插槽与首访占位逻辑。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>未定义差异化空状态模板，用户在筛选无结果时需抬头重新寻找顶部重置按钮。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>根据《方案完备性检视 2. 空白/零数据态》，源码中表格仅定义了默认文字占位，未区分“首访无数据（需引导创建）”与“搜索无匹配（需一键清空筛选）”两种不同心智模式的情境化插槽。</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>新租户首次配置缺乏心智引流路径，增加开通上手的学习与摸索门槛。</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>提供差异化空状态插槽：① 搜索无结果时提供【一键重置筛选条件】次级按钮；② 租户首次无数据时展示拓扑插画并提供【立即接入首个 POP 节点】主行动按钮。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 待验证假设区域 -->
+        <section class="hypothesis-section">
+            <h2>观察备注 / 待验证假设 (未经任务反证，仅作记录)</h2>
+            <div class="hypothesis-box">
+                <div class="hypothesis-card">
+                    <div class="tag-group">
+                        <span class="issue-tag tag-confidence">待验证假设</span>
+                        <span class="issue-tag tag-dimension">维度 4：方案完备性</span>
+                    </div>
+                    <h3 class="hypothesis-title">隧道监控图表在网络瞬断时的数据重连策略是否支持指数退避机制</h3>
+                    <div class="issue-evidence-grid">
+                        <div class="issue-evidence-media">
+                            <div class="issue-img-wrapper" onclick="openLightbox('assets/tunnel_management_review.png')">
+                                <img src="assets/tunnel_management_review.png" alt="隧道拓扑管理大盘截图">
+                            </div>
+                            <p class="image-caption">图 6：隧道监控折线图 WebSocket 连接状态观察</p>
+                        </div>
+                        <div class="issue-detail-panel">
+                            <div class="issue-field">
+                                <h4>观察依据</h4>
+                                <p>在弱网模拟下发现实时监控图表存在 3 次连续 500ms 重试，未观察到显式重试上限或向用户展示“连接中断，点击手动重试”的行内兜底提示。</p>
+                            </div>
+                            <div class="issue-field">
+                                <h4>待验证问题</h4>
+                                <p>需进一步结合后端网关的长连接保活配置，确认在长时间断网恢复后前端是否能无感静默恢复图表推流，避免造成控制台内存堆积。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 评分定性标准说明 -->
+        <section class="scoring-rules">
+            <h2>体验评分与问题等级定性规则</h2>
+            <table class="rules-table">
+                <thead>
+                    <tr>
+                        <th>问题等级</th>
+                        <th>单项扣分</th>
+                        <th>扣分上限</th>
+                        <th>业务后果定性标准（严格依据）</th>
+                        <th>典型业务特征</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>P1 (严重)</strong></td>
+                        <td>10分</td>
+                        <td>无上限</td>
+                        <td><strong>主任务死胡同</strong>：核心排查/配置路径完全阻断且无替代方案；或存在重大数据丢失/高危风险防误触机制缺失。</td>
+                        <td>阻塞性 Bug、流程完全断裂、高危操作无确认机制。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>P2 (较重)</strong></td>
+                        <td>5分</td>
+                        <td>无上限</td>
+                        <td><strong>关键上下文断层/高频剧烈摩擦</strong>：跨页面跳转重置了过滤条件/时间范围导致排查打断；或日均高频操作被迫增加 &ge;3 次冗余跳转；或关键诊断指标缺失导致无法归因。</td>
+                        <td>告警分析下钻丢失参数、高频场景严重低效、核心诊断关联数据缺失。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>P3 (轻微)</strong></td>
+                        <td>2分</td>
+                        <td>无上限</td>
+                        <td><strong>轻微体验干预</strong>：有直观的可替代绕行路径；次要信息层级模糊；低频配置项交互不够顺畅。</td>
+                        <td>次要功能障碍、视觉/交互不一致、低频场景感知问题。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>P4 (瑕疵)</strong></td>
+                        <td>0.5分</td>
+                        <td>最多扣3分/类</td>
+                        <td><strong>细节瑕疵</strong>：纯视觉/文案细节，不影响功能决策与任何任务流程。</td>
+                        <td>对齐/间距瑕疵、动效微调、极端边缘场景。</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <!-- 灯箱弹窗 -->
+    <div id="lightbox" onclick="this.style.display='none'">
+        <img id="lightbox-img" src="" alt="Zoomed view">
+    </div>
+
+    <script>
+        function openLightbox(url) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+    </script>
+</body>
+
+</html>

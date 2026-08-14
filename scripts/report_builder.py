@@ -87,27 +87,61 @@ def build_issue_card(issue, standalone=False):
                     img_url = f"assets/{img_file}"
             else:
                 img_url = f"assets/{img_file}"
-        else:
-            img_url = f"assets/{img_file}"
+    if img_url:
+        media_html = f"""<div class="issue-img-wrapper" onclick="openLightbox('{img_url}')">
+                            <img src="{img_url}" alt="问题截图">
+                        </div>
+                        <p class="image-caption">{issue.get('image_caption', '点击可放大查看截图证据')}</p>"""
+    else:
+        media_html = f"""<div class="issue-img-placeholder">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                            <div>
+                                <strong>截图未获取或此问题关联界面不存在</strong>
+                                <div class="placeholder-tip">代码静态审查发现 · 状态插槽未定义</div>
+                            </div>
+                        </div>
+                        <p class="image-caption">{issue.get('image_caption', '说明：经源码静态检视，该状态组件在原型中未被定义或未提供独立渲染视图')}</p>"""
 
     return f"""
             <div class="issue-card">
-                <div class="issue-img-wrapper" onclick="openLightbox('{img_url}')">
-                    <img src="{img_url}" alt="问题截图">
+                <div class="tag-group">
+                    <span class="issue-tag tag-scenario">{issue.get('scenario_tag', '')}</span>
+                    <span class="issue-tag tag-dimension">{issue.get('dimension_tag', '')}</span>
+                    <span class="issue-tag tag-{sev}">{SEVERITY_DISPLAY.get(sev, sev.upper())}</span>
+                    <span class="issue-tag tag-confidence">{issue.get('confidence_text', '实证成立')}</span>
                 </div>
-                <div class="issue-content">
-                    <div class="tag-group">
-                        <span class="issue-tag tag-scenario">{issue.get('scenario_tag', '')}</span>
-                        <span class="issue-tag tag-dimension">{issue.get('dimension_tag', '')}</span>
-                        <span class="issue-tag tag-{sev}">{SEVERITY_DISPLAY.get(sev, sev.upper())}</span>
+                <h3 class="issue-title">{issue.get('title', '')}</h3>
+                <div class="issue-evidence-grid">
+                    <div class="issue-evidence-media">
+                        {media_html}
                     </div>
-                    <h3 class="issue-title">{issue.get('title', '')}</h3>
-                    <div class="issue-description">
-                        {issue.get('description', '')}
-                    </div>
-                    <div class="solution-box">
-                        <h4>建议改进方案</h4>
-                        {issue.get('solution', '')}
+                    <div class="issue-detail-panel">
+                        <div class="issue-field">
+                            <h4>对应任务</h4>
+                            <p>{issue.get('related_task', '—')}</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>已尝试路径</h4>
+                            <p>{issue.get('tried_path', '—')}</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>替代路径检查</h4>
+                            <p>{issue.get('alternative_path_check', '—')}</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>问题描述</h4>
+                            <p>{issue.get('description', '')}</p>
+                        </div>
+                        <div class="issue-field">
+                            <h4>业务影响</h4>
+                            <p>{issue.get('business_impact', '')}</p>
+                        </div>
+                        <div class="solution-box">
+                            <h4>建议改进方案</h4>
+                            <p>{issue.get('solution', '')}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,6 +181,86 @@ def build_report(data, standalone=False):
     content = content.replace('{{P3_COUNT}}', str(p3))
     content = content.replace('{{P4_COUNT}}', str(p4))
     
+    # 4 大维度定性结果标准字典与样式映射
+    VALID_DIM_ENUMS = {
+        'dim1': {
+            '超预期达成': 'result-pass', '达成': 'result-pass', '基础达成': 'result-warning',
+            '未达成': 'result-fail', '未显式走查': ''
+        },
+        'dim2': {
+            '符合': 'result-pass', '基本符合，有优化空间': 'result-pass', '部分符合': 'result-warning',
+            '不符合': 'result-fail', '未显式走查': ''
+        },
+        'dim3': {
+            '通过': 'result-pass', '基础达成': 'result-warning', '未达成': 'result-fail', '未显式走查': ''
+        },
+        'dim4': {
+            '完备': 'result-pass', '基本完备，存在边缘缺失': 'result-pass', '完备性不足': 'result-warning',
+            '严重缺失': 'result-fail', '未显式走查': ''
+        }
+    }
+
+    # 4 大维度默认意图定义
+    DEFAULT_INTENTS = {
+        1: '验证核心用户主任务剧本的通畅度与体验目标闭环',
+        2: '评估方案与产品愿景、品牌内核及更高维解法的契合度',
+        3: '排查通用 UX 交互原则、表单校验、防错及状态反馈合规性',
+        4: '扫描全状态矩阵、极端临界数据与环境自适应能力'
+    }
+
+    # 统计各维度的问题数
+    dim_issue_counts = {1: [], 2: [], 3: [], 4: []}
+    for issue in issues:
+        dim_str = issue.get('dimension_tag', '')
+        sev = issue.get('severity', 'p3').upper()
+        for d in range(1, 5):
+            if f'维度 {d}' in dim_str or f'维度{d}' in dim_str or f'dim{d}' in dim_str.lower():
+                dim_issue_counts[d].append(sev)
+
+    # 替换 4 大维度定性结果占位符并做合法性校验
+    dimensions = data.get('dimensions', {})
+    for i in range(1, 5):
+        dim_key = f'dim{i}'
+        res_key = f'dim{i}_result'
+        exp_key = f'dim{i}_explanation'
+        intent_key = f'dim{i}_intent'
+        content_key = f'dim{i}_content'
+
+        val = dimensions.get(res_key, '未显式走查').strip()
+        intent_val = dimensions.get(intent_key, DEFAULT_INTENTS.get(i, ''))
+        content_val = dimensions.get(content_key, f'执行维度 {i} 专项走查与验证')
+        
+        # 白名单断言校验
+        if val not in VALID_DIM_ENUMS[dim_key]:
+            print(f"[Warning] 维度 {i} 定性结论 '{val}' 不在标准白名单中！合法取值: {list(VALID_DIM_ENUMS[dim_key].keys())}")
+        
+        # 计算问题数字符串
+        sev_list = dim_issue_counts[i]
+        if not sev_list:
+            issue_count_str = "0"
+            issue_count_cls = "issue-count-zero"
+        else:
+            p1_c = sev_list.count('P1')
+            p2_c = sev_list.count('P2')
+            p3_c = sev_list.count('P3')
+            p4_c = sev_list.count('P4')
+            parts = []
+            if p1_c: parts.append(f"{p1_c}个 P1")
+            if p2_c: parts.append(f"{p2_c}个 P2")
+            if p3_c: parts.append(f"{p3_c}个 P3")
+            if p4_c: parts.append(f"{p4_c}个 P4")
+            issue_count_str = ", ".join(parts) if parts else f"{len(sev_list)}个"
+            issue_count_cls = "issue-count-has"
+
+        cls_name = VALID_DIM_ENUMS[dim_key].get(val, '')
+        content = content.replace(f'{{{{DIMENSION_{i}_INTENT}}}}', intent_val)
+        content = content.replace(f'{{{{DIMENSION_{i}_CONTENT}}}}', content_val)
+        content = content.replace(f'{{{{DIMENSION_{i}_RESULT}}}}', val)
+        content = content.replace(f'{{{{DIMENSION_{i}_RESULT_CLASS}}}}', cls_name)
+        content = content.replace(f'{{{{DIMENSION_{i}_ISSUE_COUNT}}}}', issue_count_str)
+        content = content.replace(f'{{{{DIMENSION_{i}_ISSUE_COUNT_CLASS}}}}', issue_count_cls)
+        content = content.replace(f'{{{{DIMENSION_{i}_EXPLANATION}}}}', dimensions.get(exp_key, f'未提供维度 {i} 结果说明。'))
+
     # 注入定性结论
     conclusion_html = data.get('conclusion', '<p style="color: var(--text-dim);">未提供定性检视结论。</p>')
     content = content.replace('{{QUALITATIVE_CONCLUSION}}', conclusion_html)

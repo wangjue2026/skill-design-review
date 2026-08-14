@@ -2,29 +2,48 @@
   "_comment": "review_issues.json 模板 — AI 检视分析完成后填写，report_builder.py 读取生成 HTML 报告",
   "_howto": "运行命令: python3 scripts/report_builder.py scripts/configs/this_file.json",
 
-  "project": "SASE 全球加速 GA",
-  "scenario": "场景 1: 体验目标的达成",
-  "persona": "零基础运维 / 企业网管",
-  "date": "2026-07-07",
+  "project": "<项目/模块名称，例如：智能仓储管理系统 / SASE 全球加速>",
+  "scenario": "<检视场景，例如：核心看板 / 批量订单配置 / 节点拓扑管理>",
+  "persona": "<测试角色，例如：企业管理员 / 运维工程师 / 财务审核员>",
+  "date": "2026-08-14",
+
+  "dimensions": {
+    "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
+    "dim1_content": "执行【<核心主任务剧本名称>】走查测试，验证是否达成【<设定的体验目标>】",
+    "dim1_result": "基础达成",
+    "dim1_explanation": "<一句话说明主干链路跑通情况及关键阻塞/摩擦点依据>",
+
+    "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
+    "dim2_content": "理解业务需求背景，结合走查测试，评估是否存在更高维的需求与设计解法",
+    "dim2_result": "部分符合",
+    "dim2_explanation": "<一句话说明与设计原则/产品愿景的对齐情况>",
+
+    "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
+    "dim3_content": "匹配 Checklist 中表单行内校验、二次确认防错、操作反馈等子维度",
+    "dim3_result": "通过",
+    "dim3_explanation": "<一句话说明常规交互与防错机制的合规情况>",
+
+    "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
+    "dim4_content": "对全量 demo/原型代码进行全状态（空白/加载/报错/极端临界）交互细节扫描",
+    "dim4_result": "完备性不足",
+    "dim4_explanation": "<一句话说明全状态与环境自适应覆盖情况>"
+  },
 
   "issues": [
     {
-      "img_file": "01_initial_page.png",
-      "scenario_tag": "初始选择页",
-      "dimension_tag": "认知与反馈 (心智模型)",
+      "img_file": "<截图文件名，若确实无截图可填 ''，会自动渲染统一占位图>",
+      "image_caption": "<图注说明：说明截图区域及问题位置>",
+      "scenario_tag": "<所在场景/模块>",
+      "dimension_tag": "<维度 1：体验目标达成 / 维度 2 / 维度 3 / 维度 4>",
       "severity": "p2",
-      "title": "【P2 较重】问题标题",
-      "description": "问题的详细描述，说明什么情况下会发生，对用户造成什么影响。",
-      "solution": "建议的改进方案，具体可执行的 To-Be 方向。"
-    },
-    {
-      "img_file": "07_display_list.png",
-      "scenario_tag": "状态监控",
-      "dimension_tag": "认知与反馈 (虚假状态反馈)",
-      "severity": "p1",
-      "title": "【P1 严重】问题标题",
-      "description": "...",
-      "solution": "..."
+      "confidence_text": "实证成立",
+      "title": "<纯设计体验语言描述的问题标题>",
+      "related_task": "<用户尝试完成的真实业务任务>",
+      "tried_path": "<AI 实际尝试的操作点击与排查链路>",
+      "alternative_path_check": "<页面是否存在替代路径，以及替代路径的摩擦成本>",
+      "description": "<问题详细描述（严禁底层 HTML/CSS 代码词汇，使用设计与体验语言）>",
+      "business_impact": "<对业务流转、任务效率、决策误导造成的具体影响>",
+      "solution": "<具体可落地的体验与交互改进建议方案>"
     }
   ]
 }
