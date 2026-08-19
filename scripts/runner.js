@@ -59,13 +59,19 @@ async function getBoundingRect(page, rawSel) {
     } else if (selObj.type === 'text') {
       const tags = ['button', 'a', 'span', 'div', 'td', 'th', 'label', 'li'];
       const candidates = tags.flatMap(tag => Array.from(document.querySelectorAll(tag)));
-      el = candidates.find(e => {
+      let best = null, bestArea = Infinity;
+      for (const e of candidates) {
         const style = window.getComputedStyle(e);
-        return e.innerText && e.innerText.trim().includes(selObj.value)
+        const ok = e.innerText && e.innerText.trim().includes(selObj.value)
           && style.display !== 'none'
           && style.visibility !== 'hidden'
           && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
-      });
+        if (!ok) continue;
+        const r0 = e.getBoundingClientRect();
+        const area = r0.width * r0.height;
+        if (area > 0 && area < bestArea) { bestArea = area; best = e; }
+      }
+      el = best;
     }
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -105,12 +111,18 @@ async function screenshotAndAnnotate(page, outputPath, annotations, assetsDir) {
         } else if (selObj.type === 'text') {
           const tags = ['button', 'a', 'span', 'div', 'td', 'th', 'label', 'li'];
           const candidates = tags.flatMap(tag => Array.from(document.querySelectorAll(tag)));
-          el = candidates.find(e => {
+          let best = null, bestArea = Infinity;
+          for (const e of candidates) {
             const s = window.getComputedStyle(e);
-            return e.innerText && e.innerText.trim().includes(selObj.value)
+            const ok = e.innerText && e.innerText.trim().includes(selObj.value)
               && s.display !== 'none' && s.visibility !== 'hidden'
               && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
-          }) || null;
+            if (!ok) continue;
+            const r0 = e.getBoundingClientRect();
+            const area = r0.width * r0.height;
+            if (area > 0 && area < bestArea) { bestArea = area; best = e; }
+          }
+          el = best || null;
         }
         return el ? (el.innerText || el.textContent || '').trim().slice(0, 60) : '';
       }, { type: ann.selector.startsWith('text/') ? 'text' : ann.selector.startsWith('xpath/') ? 'xpath' : 'css', value: ann.selector.startsWith('text/') ? ann.selector.slice(5) : ann.selector.startsWith('xpath/') ? ann.selector.slice(6) : ann.selector.startsWith('css:') ? ann.selector.slice(4) : ann.selector }).catch(() => '');
@@ -161,13 +173,19 @@ async function executeAction(page, action, config, resolvedAssetsDir) {
         if (sel.type === 'text') {
           const handle = await page.evaluateHandle((txt) => {
             const tags = ['button', 'a', 'span', 'div', 'td', 'th', 'label', 'li'];
-            return tags.flatMap(tag => Array.from(document.querySelectorAll(tag)))
-              .find(e => {
-                const s = window.getComputedStyle(e);
-                return e.innerText && e.innerText.trim().includes(txt)
-                  && s.display !== 'none' && s.visibility !== 'hidden'
-                  && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
-              }) || null;
+            const candidates = tags.flatMap(tag => Array.from(document.querySelectorAll(tag)));
+            let best = null, bestArea = Infinity;
+            for (const e of candidates) {
+              const s = window.getComputedStyle(e);
+              const ok = e.innerText && e.innerText.trim().includes(txt)
+                && s.display !== 'none' && s.visibility !== 'hidden'
+                && (e.offsetWidth > 0 || e.offsetHeight > 0 || e.getClientRects().length > 0);
+              if (!ok) continue;
+              const r0 = e.getBoundingClientRect();
+              const area = r0.width * r0.height;
+              if (area > 0 && area < bestArea) { bestArea = area; best = e; }
+            }
+            return best || null;
           }, sel.value);
           const el = handle.asElement();
           if (el) { await el.click(); console.log(`  [click] text/${sel.value}`); }

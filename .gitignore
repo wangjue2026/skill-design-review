@@ -21,3 +21,28 @@ ENV/
 # Project specific
 node_modules/
 .npm/
+
+# -----------------------------------------------
+# 检视任务执行产出物（过程文件，不进入版本控制）
+# -----------------------------------------------
+
+# 生成的 HTML / Markdown 检视报告
+Reports/*.html
+Reports/*.md
+
+# 截图与批注图资产目录
+Reports/assets/
+
+# 走查过程中产生的临时截图
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# 具体项目的 issues / review JSON（仅保留模板）
+scripts/configs/*.json
+!scripts/configs/_template.json
+!scripts/configs/_template_issues.json
+
+# 一次性数据录入脚本（过程文件）
+scripts/write_*.py

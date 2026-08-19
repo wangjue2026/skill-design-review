@@ -87,6 +87,8 @@ def build_issue_card(issue, standalone=False):
                     img_url = f"assets/{img_file}"
             else:
                 img_url = f"assets/{img_file}"
+        else:
+            img_url = f"assets/{img_file}"
     if img_url:
         media_html = f"""<div class="issue-img-wrapper" onclick="openLightbox('{img_url}')">
                             <img src="{img_url}" alt="问题截图">
@@ -110,7 +112,7 @@ def build_issue_card(issue, standalone=False):
                     <span class="issue-tag tag-scenario">{issue.get('scenario_tag', '')}</span>
                     <span class="issue-tag tag-dimension">{issue.get('dimension_tag', '')}</span>
                     <span class="issue-tag tag-{sev}">{SEVERITY_DISPLAY.get(sev, sev.upper())}</span>
-                    <span class="issue-tag tag-confidence">{issue.get('confidence_text', '实证成立')}</span>
+                    <span class="issue-tag tag-confidence">{issue.get('confidence_text', '高置信')}</span>
                 </div>
                 <h3 class="issue-title">{issue.get('title', '')}</h3>
                 <div class="issue-evidence-grid">
@@ -192,12 +194,21 @@ def build_report(data, standalone=False):
             '不符合': 'result-fail', '未显式走查': ''
         },
         'dim3': {
-            '通过': 'result-pass', '基础达成': 'result-warning', '未达成': 'result-fail', '未显式走查': ''
+            '通过': 'result-pass', '基本通过，有优化空间': 'result-pass', '基础达成': 'result-warning',
+            '未达成': 'result-fail', '未显式走查': ''
         },
         'dim4': {
             '完备': 'result-pass', '基本完备，存在边缘缺失': 'result-pass', '完备性不足': 'result-warning',
             '严重缺失': 'result-fail', '未显式走查': ''
         }
+    }
+
+    # 允许「0 问题」的满分结论词；其余结论（含"有优化空间/存在边缘缺失"等）必须 ≥1 个问题
+    FULL_SCORE_RESULTS = {
+        'dim1': {'超预期达成', '达成'},
+        'dim2': {'符合'},
+        'dim3': {'通过'},
+        'dim4': {'完备'},
     }
 
     # 4 大维度默认意图定义
@@ -233,6 +244,11 @@ def build_report(data, standalone=False):
         # 白名单断言校验
         if val not in VALID_DIM_ENUMS[dim_key]:
             print(f"[Warning] 维度 {i} 定性结论 '{val}' 不在标准白名单中！合法取值: {list(VALID_DIM_ENUMS[dim_key].keys())}")
+
+        # 结论-问题数一致性校验：非满分结论必须 ≥1 个问题
+        if val in VALID_DIM_ENUMS[dim_key] and val != '未显式走查' and val not in FULL_SCORE_RESULTS[dim_key]:
+            if not dim_issue_counts[i]:
+                print(f"[Warning] 维度 {i} 结论 '{val}' 暗示存在优化/缺失，但该维度问题数为 0，请补问题或改为满分结论词。")
         
         # 计算问题数字符串
         sev_list = dim_issue_counts[i]
@@ -279,19 +295,69 @@ def build_report(data, standalone=False):
     else:
         content = content.replace('{{ISSUE_LIST}}', issue_list_html)
 
+    # 处理待验证假设区域：无假设时移除整个 section，避免 {{HYPOTHESIS_*}} 占位符与默认截图容器残留
+    if not data.get('hypotheses'):
+        sec_start = content.find('<section class="hypothesis-section">')
+        if sec_start != -1:
+            sec_end = content.find('</section>', sec_start)
+            if sec_end != -1:
+                content = content[:sec_start] + content[sec_end + len('</section>'):]
+
     return content, score, total, p1, p2, p3, p4
+
+# ──────────────────────────────────────────────────────────────
+#  准出自检（报告生成后强制校验）
+# ──────────────────────────────────────────────────────────────
+
+def self_check(html_content, issues):
+    """返回 (检查项名, 是否通过, 说明) 列表。"""
+    checks = []
+
+    img_issues = [i for i in issues if i.get('img_file')]
+    noimg_issues = [i for i in issues if not i.get('img_file')]
+    wrapper_count = html_content.count('class="issue-img-wrapper"')
+    placeholder_count = html_content.count('class="issue-img-placeholder"')
+    wrapper_ok = wrapper_count == len(img_issues)
+    placeholder_ok = placeholder_count == len(noimg_issues)
+    checks.append((
+        '问题截图引用',
+        wrapper_ok and placeholder_ok,
+        f'wrapper={wrapper_count}/{len(img_issues)} 占位图={placeholder_count}/{len(noimg_issues)}'
+    ))
+
+    has_rules = '体验评分与问题等级定性规则' in html_content
+    checks.append(('底部评分表', has_rules, '存在' if has_rules else '缺失'))
+
+    return checks
 
 # ──────────────────────────────────────────────────────────────
 #  主流程
 # ──────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('Usage: python3 scripts/report_builder.py <issues_json_path>')
+    # 命令行参数解析（仅支持极简 flag，便于 CI / 脚本调用）
+    args = [a for a in sys.argv[1:]]
+    issues_path = None
+    slug = None
+    standalone_only = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == '--slug' and i + 1 < len(args):
+            slug = args[i + 1]; i += 2
+        elif a == '--standalone-only':
+            standalone_only = True; i += 1
+        elif not a.startswith('--') and issues_path is None:
+            issues_path = a; i += 1
+        else:
+            i += 1
+
+    if not issues_path:
+        print('Usage: python3 scripts/report_builder.py <issues_json_path> [--slug NAME] [--standalone-only]')
         print('Example: python3 scripts/report_builder.py scripts/configs/ga_issues.json')
         sys.exit(1)
 
-    issues_path = os.path.abspath(sys.argv[1])
+    issues_path = os.path.abspath(issues_path)
     if not os.path.exists(issues_path):
         print(f'Error: Issues file not found: {issues_path}')
         sys.exit(1)
@@ -299,27 +365,32 @@ if __name__ == '__main__':
     with open(issues_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # 1. 生成普通版本（引用外部资产图片）
-    html_content, score, total, p1, p2, p3, p4 = build_report(data, standalone=False)
-    
-    project_slug = data.get('project', 'Review').replace(' ', '_').replace('/', '_')
+    project_slug = slug or data.get('project', 'Review').replace(' ', '_').replace('/', '_')
     date_tag = data.get('date', datetime.now().strftime('%Y%m%d')).replace('-', '')
-    output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
-    output_path = os.path.join(REPORTS_DIR, output_filename)
 
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(html_content)
-    print(f'\n✅ Standard Report generated: {output_path}')
+    # 1. 生成普通版本（引用外部资产图片）
+    if not standalone_only:
+        html_content, score, total, p1, p2, p3, p4 = build_report(data, standalone=False)
+        output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
+        output_path = os.path.join(REPORTS_DIR, output_filename)
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        print(f'\n✅ Standard Report generated: {output_path}')
+
+        print('   准出自检：')
+        for name, ok, note in self_check(html_content, data.get('issues', [])):
+            mark = '✅' if ok else '❌'
+            print(f'     {mark} {name}: {note}')
 
     # 2. 生成 Standalone 版本（图片 Base64 内联）
-    html_content_standalone, _, _, _, _, _, _ = build_report(data, standalone=True)
+    html_content_standalone, score, total, p1, p2, p3, p4 = build_report(data, standalone=True)
     output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'
     output_path_standalone = os.path.join(REPORTS_DIR, output_filename_standalone)
-    
+    os.makedirs(REPORTS_DIR, exist_ok=True)
     with open(output_path_standalone, 'w', encoding='utf-8') as f:
         f.write(html_content_standalone)
     print(f'✅ Standalone Report generated: {output_path_standalone}')
-    
+
     print(f'   Total issues : {total} (P1:{p1} P2:{p2} P3:{p3} P4:{p4})')
     print(f'   Score        : {score:.1f} / 100')

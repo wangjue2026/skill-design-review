@@ -36,7 +36,7 @@
       "scenario_tag": "<所在场景/模块>",
       "dimension_tag": "<维度 1：体验目标达成 / 维度 2 / 维度 3 / 维度 4>",
       "severity": "p2",
-      "confidence_text": "实证成立",
+      "confidence_text": "高置信",
       "title": "<纯设计体验语言描述的问题标题>",
       "related_task": "<用户尝试完成的真实业务任务>",
       "tried_path": "<AI 实际尝试的操作点击与排查链路>",
