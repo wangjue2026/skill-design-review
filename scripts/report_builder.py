@@ -360,8 +360,24 @@ def build_report(data, standalone=False):
     content = content.replace('{{QUALITATIVE_CONCLUSION}}', conclusion_html)
 
     # 生成问题列表 HTML：判断是否命中「维度 4 批量 P3/P4 规则」
-    if should_render_as_dim4_table(issues):
-        issue_list_html = build_dim4_table(issues)
+    dim4_p3p4_issues = []
+    card_issues = []
+
+    for issue in issues:
+        dim_str = issue.get('dimension_tag', '').lower()
+        is_dim4 = ('维度 4' in dim_str or '维度4' in dim_str or 'dim4' in dim_str or '完备' in dim_str)
+        sev = issue.get('severity', '').lower()
+        if is_dim4 and sev in ('p3', 'p4'):
+            dim4_p3p4_issues.append(issue)
+        else:
+            card_issues.append(issue)
+
+    if len(dim4_p3p4_issues) > 3:
+        rendered_parts = []
+        if card_issues:
+            rendered_parts.append('\n'.join(build_issue_card(issue, standalone=standalone) for issue in card_issues))
+        rendered_parts.append(build_dim4_table(dim4_p3p4_issues))
+        issue_list_html = '\n'.join(rendered_parts)
     else:
         issue_list_html = '\n'.join(build_issue_card(issue, standalone=standalone) for issue in issues)
 
@@ -394,13 +410,36 @@ def self_check(html_content, issues):
     """返回 (检查项名, 是否通过, 说明) 列表。"""
     checks = []
 
-    if should_render_as_dim4_table(issues):
+    dim4_p3p4 = []
+    card_issues = []
+    for issue in issues:
+        dim_str = issue.get('dimension_tag', '').lower()
+        is_dim4 = ('维度 4' in dim_str or '维度4' in dim_str or 'dim4' in dim_str or '完备' in dim_str)
+        sev = issue.get('severity', '').lower()
+        if is_dim4 and sev in ('p3', 'p4'):
+            dim4_p3p4.append(issue)
+        else:
+            card_issues.append(issue)
+
+    if len(dim4_p3p4) > 3:
         has_table = 'class="dim4-completeness-table"' in html_content
         checks.append((
             '维度 4 完备性汇总表格',
             has_table,
-            f'已汇总展示 {len(issues)} 个 P3/P4 问题' if has_table else '表格缺失'
+            f'已汇总展示 {len(dim4_p3p4)} 个 P3/P4 问题' if has_table else '表格缺失'
         ))
+        if card_issues:
+            img_issues = [i for i in card_issues if i.get('img_file')]
+            noimg_issues = [i for i in card_issues if not i.get('img_file')]
+            wrapper_count = html_content.count('class="issue-img-wrapper"')
+            placeholder_count = html_content.count('class="issue-img-placeholder"')
+            wrapper_ok = wrapper_count == len(img_issues)
+            placeholder_ok = placeholder_count == len(noimg_issues)
+            checks.append((
+                '核心问题卡片截图引用',
+                wrapper_ok and placeholder_ok,
+                f'wrapper={wrapper_count}/{len(img_issues)} 占位图={placeholder_count}/{len(noimg_issues)}'
+            ))
     else:
         img_issues = [i for i in issues if i.get('img_file')]
         noimg_issues = [i for i in issues if not i.get('img_file')]

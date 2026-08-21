@@ -1,72 +1,158 @@
 {
-  "project": "DEM-数字体验监控系统",
-  "scenario": "首页与用户界面设计检视 (维度2 + 维度3)",
-  "persona": "网络与安全运维管理员 (10年+ 专家视角)",
-  "base_url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)",
-  "viewport": { "width": 1440, "height": 900 },
-  "assets_dir": "../../Reports/assets",
+  "project": "DEM-方案五（首页/用户详情/应用详情）",
+  "scenario": "何总 16:00~16:20 VIP接待室多应用卡顿紧急排障定位",
+  "persona": "IT 运维工程师（小李）/ 0基础网络安全运维人员",
+  "date": "2026-08-21",
 
-  "steps": [
+  "dimensions": {
+    "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
+    "dim1_content": "执行【何总VIP接待室多应用卡顿紧急报障】走查测试，验证是否达成【全链路异常分段高亮与关联影响面聚合、10分钟内故障定界】体验目标",
+    "dim1_result": "基础达成",
+    "dim1_explanation": "主任务排障链路基本跑通，时间线异常突变与链路标红清晰；但多应用受损缺乏横向收敛看板，且下钻至应用详情时丢包排障时段上下文。",
+
+    "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
+    "dim2_content": "识别需求为【运维排障/应急定位类】，锚定【高效运维/自愈/全面掌控】愿景，评估是否存在更高维的设计与需求解法",
+    "dim2_result": "部分符合",
+    "dim2_explanation": "具备全链路分段指标数据，但核心根因定界与影响面聚合视图缺位，强迫运维查数脑补，且缺少 Actionable 一键处置与沟通闭环。",
+
+    "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
+    "dim3_content": "激活公共子维度 1-4（视觉一致/交互效率/认知防错/文案规范）+ 特定子维度 5(总览大盘)、11(运营监控)、13(日志分析)、14(详情展示)、20(数据流转)、21(访问路径)、23(反馈)、25(适配)",
+    "dim3_result": "基本通过，有优化空间",
+    "dim3_explanation": "整体卡片与手风琴交互规范，但在首页 VIP 卡片直接下钻、拓扑节点滚动联动、一键复制建议与工单闭环方面存在操作摩擦。",
+
+    "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
+    "dim4_content": "对方案五 3 大核心页面（首页、用户详情、应用详情）进行 12 类方案完备性与全状态矩阵静态扫描",
+    "dim4_result": "完备性不足",
+    "dim4_explanation": "缺少 URL 状态持久化(Deep Linking)、首屏骨架屏、敏感 IP/工号脱敏机制以及 1280px 小分辨率自适应适配。"
+  },
+
+  "conclusion": "<div class='conclusion-summary'><p>本次检视针对<strong>方案五（首页、用户详情、应用详情）</strong>在【何总 16:00~16:20 16楼第一VIP接待室紧急报障】剧本下展开深度 UX 体验走查与全状态扫描。系统在<strong>全链路分段可视化、时间突变趋势线、VIP异常识别与多跳路由明细</strong>上表现出色，主干排障流程可基本跑通。但在<strong>根因定界与波及影响面聚合呈现、多业务受损共性收敛、下钻上下文继承、Actionable 处置闭环以及 Deep Linking 状态持久化</strong>等核心体验上存在显著断层，尚未完全实现‘0 基础运维一眼看懂问题与影响面、10 分钟快速定界’的极致体验目标。</p></div>",
+
+  "issues": [
     {
-      "name": "DEM 首页全景与体验问题告警卡片",
-      "actions": [
-        { "type": "navigate", "url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)/DEM-首页.html" },
-        { "type": "wait", "ms": 1000 }
-      ],
-      "screenshot": {
-        "file": "01_dem_home_overview.png",
-        "annotations": [
-          {
-            "selector": "css:.dem-alert-card",
-            "label": "[P2-较重] 拓扑节点明确定位但缺失一键处置动作入口",
-            "color": "orange"
-          },
-          {
-            "selector": "css:.dem-select",
-            "label": "[P2-较重] 告警筛选后状态下钻返回重置",
-            "color": "orange"
-          }
-        ]
-      }
+      "img_file": "dem_user_root_cause_missing_annotated.png",
+      "image_caption": "用户详情页：时间线上方与拓扑上方缺失综合根因定界与影响面聚合看板（底层有数据但 UI 未渲染）",
+      "scenario_tag": "用户详情 / 智能诊断",
+      "dimension_tag": "维度 2：产品理念契合度",
+      "severity": "p2",
+      "confidence_text": "高置信",
+      "title": "故障综合定界与波及影响面聚合看板缺位，强迫运维逐段查数脑补根因",
+      "related_task": "何总 16:20 报障'VIP接待室OA/ERP/飞书持续卡顿'，0 基础运维小李在 10 分钟内完成故障定界、波及范围评估与应急建议",
+      "tried_path": "从首页点击何总详情进入用户详情页，观察首屏无自然语言总结，逐层滚动展开手风琴查看 Wi-Fi -82dBm、终端-POP 丢包 5.2% 及 Hop 1 局域网网关丢包 4.8%",
+      "alternative_path_check": "可在展开的 3~4 个技术参数卡片中自行推理，但耗时费力且容易出现技术认知门槛，不存在 1~2 步内的聚合结论替代路径",
+      "description": "底层 Mock 数据已具备极高价值的智能定界与影响面数据（包含 16 楼 VIP 接待室走廊 AP 盲区、-82dBm 信号衰减、38% 空口重传、网关 4.8% 丢包、波及 3 款核心应用、北京 POP/OA 服务器健康等），但前端 UI 未渲染【根因定界与影响面聚合卡片】。运维人员进入页面后无法一眼看懂自然语言转译后的结论，仍被迫充当'人工数据分析器'逐项阅读底层网络参数。",
+      "business_impact": "严重违背'0 基础运维一眼看懂问题与影响面，10 分钟内定界'的体验目标。在 VIP 紧急报障的高压场景下，初级运维容易慌乱或误判为'公司骨干网故障/OA服务器崩溃'，延误排障与高管沟通。",
+      "solution": "在用户详情页时间线上方常驻【AI 智能定界与影响面聚合卡片】（支持一键收起/展开）：1. 根因定界一句话结论（去技术化指出 16 楼 VIP 接待室无线 AP 盲区及本地网关丢包，骨干网与服务端正常）；2. 影响面聚合（波及何总 3 款应用及同接待室网段，排除全网大面积故障）；3. 处置建议（建议用户连接会议桌有线网线，通知无线网管调优 AP 射频功率）。"
     },
     {
-      "name": "DEM 首页唤起 AI Agent 智能排障抽屉",
-      "actions": [
-        { "type": "click", "selector": "text/查看详情" },
-        { "type": "wait", "ms": 800 }
-      ],
-      "screenshot": {
-        "file": "02_dem_ai_drawer.png",
-        "annotations": [
-          {
-            "selector": "text/查看详细分析链与逻辑举证",
-            "label": "[P1-严重] 二级抽屉完全遮挡主对话上下文",
-            "color": "red"
-          }
-        ]
-      }
+      "img_file": "dem_user_app_convergence_annotated.png",
+      "image_caption": "用户详情页：横向应用槽位虽展示受损应用，但缺乏多应用故障共性根因横向收敛视图",
+      "scenario_tag": "用户详情 / 应用选择",
+      "dimension_tag": "维度 1：体验目标达成",
+      "severity": "p2",
+      "confidence_text": "高置信",
+      "title": "多应用受损缺乏横向共性根因收敛，排障需频繁单点切换割裂比对",
+      "related_task": "针对何总关于'OA、ERP、飞书等多个系统同时转圈'的全局性疑问，快速自证与解释是否为网络公共瓶颈导致",
+      "tried_path": "在用户详情页应用槽位中依次点击 OA系统、ERP系统、飞书平台，每次点击均需重载下方拓扑图与手风琴，脑内比对各应用指标",
+      "alternative_path_check": "虽可单点切换 8 个卡片，但各应用拓扑与明细孤立展示，无法同屏直观横向比对公共瓶颈段",
+      "description": "当用户遭遇多个业务同时变差时，系统未能提供'多业务受损共性归因看板'，而是要求运维在各应用之间机械反复切换。运维在切换过程中需在大脑中记忆上一个应用的指标数据，认知负荷大且难以快速向用户解释多业务并发卡顿的本质原因。",
+      "business_impact": "无法第一时间自证'非多应用各自故障，而是本地公共无线网段瓶颈'，增加 3 倍以上冗余比对点击，延长故障定界时间。",
+      "solution": "在应用选择器区域增加【多业务受损共性诊断模式】：当检测到当前用户 $\\ge 2$ 个应用同时变差且收敛于同一网络瓶颈段时，自动展示'共性瓶颈关联卡片'，直观呈现'受影响应用：OA系统、ERP系统、企业邮箱（共同瓶颈：办公室Wi-Fi接入段）'，实现多业务 1 秒收敛定界。"
     },
     {
-      "name": "DEM 用户访问体验看板",
-      "actions": [
-        { "type": "navigate", "url": "file:///Users/wj/Desktop/项目文件/SMG-DEM/Demos/01-方案一(全貌)/DEM-用户.html" },
-        { "type": "wait", "ms": 1000 }
-      ],
-      "screenshot": {
-        "file": "03_dem_user_page.png",
-        "annotations": [
-          {
-            "selector": "css:.dem-table-container",
-            "label": "[P2-较重] 体验受阻人次缺乏受影响人数交叉分析且单位缺空格",
-            "color": "orange"
-          },
-          {
-            "selector": "css:table.dem-table td:nth-child(4)",
-            "label": "[P3-轻微] IP归属地与POP节点技术工程化词汇残留",
-            "color": "yellow"
-          }
-        ]
-      }
+      "img_file": "dem_app_details_context_lost_annotated.png",
+      "image_caption": "应用详情页：从用户详情下钻跳转后，未继承何总 ID 与 16:00~16:20 案发时段上下文",
+      "scenario_tag": "应用详情 / 跨页下钻",
+      "dimension_tag": "维度 1：体验目标达成",
+      "severity": "p2",
+      "confidence_text": "高置信",
+      "title": "用户下钻至应用详情丢失排障时段与用户上下文，列表未自动聚焦案发记录",
+      "related_task": "从何总用户详情下钻到'OA系统'应用详情，从应用宏观视角交叉核实全网受影响范围与何总的访问日志",
+      "tried_path": "在用户详情页应用节点右侧点击【查看应用详情 >】，跳转至 DEM-应用详情.html，切换至'用户访问明细'Tab 查找何总记录",
+      "alternative_path_check": "运维需在应用详情搜索框重新输入 45232，并重新核对时间范围，增加了 2~3 步重复操作",
+      "description": "跨页面下钻存在明显的上下文丢包（Context Lost）。在用户详情页是以何总在 16:00~16:20 访问 OA 为核心上下文；但点击链接跳转至应用详情页后，系统仅传递了 appId 与 appName，未继承 focusUserId=45232 及 timeRange。进入页面后展示全天全局用户列表，何总未被自动置顶高亮。",
+      "business_impact": "打断了运维从'单点微观排查'到'应用宏观定界'的排障心流，迫使运维在不同页面间重新设置过滤条件，极易引起数据误读。",
+      "solution": "完善跨页面 Deep Linking 传参机制，URL 携带 `?appId=app_oa&focusUserId=45232&timeRange=16:00-16:20`；应用详情页接收参数后，自动在'用户访问明细'Tab 中将何总排在首行高亮，并默认过滤该时段的异常访问会话。"
+    },
+    {
+      "img_file": "dem_homepage_vip_click_annotated.png",
+      "image_caption": "首页：右上角 VIP 对象体验卡片仅为只读展示，点击列表项无法直接下钻至用户详情",
+      "scenario_tag": "首页 / VIP对象监控",
+      "dimension_tag": "维度 3：常规交互Checklist",
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "title": "首页 VIP 异常对象卡片缺少行级直接下钻与紧急排障会话入口",
+      "related_task": "IT 小李在接到何总飞书报障的第一时间（16:21），在 DEM 首页快速定位何总并一键直达排障案发现场",
+      "tried_path": "打开 DEM 首页，在右上角'VIP对象体验'卡片中看到 45232（何总），尝试点击该行文字无反应，转而移动视线至下方大表格在搜索框键入 45232 过滤后再点击详情",
+      "alternative_path_check": "下方搜索框能快速过滤并跳转，存在明确的替代路径，但多耗费了 2 步输入与查找成本",
+      "description": "首页右上角设置了专门的'VIP对象体验'卡片，其核心价值本应是'高危/高管异常 1 步直达处置'；但该卡片仅为静态只读展示，点击列表项无法直接跳转至对应的用户详情页。",
+      "business_impact": "在紧急 VIP 报障的高压场景下增加了不必要的查找与键入摩擦，降低了指挥中心的响应敏捷度。",
+      "solution": "将'VIP对象体验'卡片中的每一行变为可点击的热区（Hover 展示手型光标与下钻箭头），点击任意 VIP 用户直接带参跳转至该用户的排障详情页。"
+    },
+    {
+      "img_file": "dem_user_action_closed_loop_annotated.png",
+      "image_caption": "用户详情页：底部诊断明细与结论区域缺少一键复制处置建议、飞书回复与工单派发行动出口",
+      "scenario_tag": "用户详情 / 行动闭环",
+      "dimension_tag": "维度 3：常规交互Checklist",
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "title": "排障定界后缺少一键生成沟通话术与工单派发等 Actionable 行动闭环",
+      "related_task": "小李完成故障定位后，需要向何总飞书回复排障结论（建议插会议室网线），并通知无线网管处理接待室 AP",
+      "tried_path": "在用户详情页完成 Wi-Fi 弱信号与网关丢包定位后，寻找页面上的'一键复制排障报告'、'飞书通知'或'创建网络工单'按钮，发现仅有纯只读信息",
+      "alternative_path_check": "运维需切出控制台，在飞书中纯靠手工打字与高管沟通，并手动登录工单系统发起报修",
+      "description": "系统只完成了'看与查'的环节，断裂了'处置与协同'的闭环。排障完成后没有提供 Actionable 的一键出口（如：'生成飞书沟通简报'、'复制用户端处置建议'、'派发网络优化工单'）。",
+      "business_impact": "运维在从 DEM 控制台到飞书沟通、工单系统的流转过程中存在断层，沟通表述可能因人而异不够专业规范，无法形成端到端的闭环体验。",
+      "solution": "在排障结论区域增加行动操作组：1.【一键复制飞书回复】（自动提取专业沟通话术：'尊敬的何总，经排查您处于 16 楼 VIP 接待室 Wi-Fi 边缘盲区，核心网络正常，建议临时插会议桌网线使用...'）；2.【一键派发网络工单】（携带 AP 位置、信号强度及网关丢包证据直接派发给无线网络管理员）。"
+    },
+    {
+      "scenario_tag": "用户详情 / 状态持久化",
+      "dimension_tag": "维度 4：方案完备性检视",
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "missing_type": "Deep Linking 状态持久化断裂",
+      "title": "用户详情切换时段与应用后 URL 未同步，分享链接丢失案发现场",
+      "description": "用户详情页切换时间采样点(如 16:00 切片)或横向切换应用(如 ERP 系统)后，浏览器 URL hash/query 未双向同步；将当前 URL 复制分享给二线同事时，对方打开页面重置回默认的初始态，丢失排障案发现场。",
+      "solution": "实现 URL query 参数与组件选中态的双向绑定（如 `?user=45232&app=app_erp&time=16:00`），支持直接分享链接还原现场。"
+    },
+    {
+      "scenario_tag": "全局 / 加载状态",
+      "dimension_tag": "维度 4：方案完备性检视",
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "missing_type": "骨架屏 (Skeleton) 缺位",
+      "title": "首屏监控大盘与全链路拓扑图缺少骨架屏加载过渡",
+      "description": "首屏监控大盘图表、访问体验时间线折线图及全链路拓扑图在数据加载期间无 Skeleton 骨架屏占位结构，数据慢加载时存在明显的白屏瞬闪与页面高度剧烈抖动跳跃。",
+      "solution": "在首页大盘卡片、趋势图与拓扑图容器中配置灰度骨架屏结构，实现平滑占位过渡。"
+    },
+    {
+      "scenario_tag": "全局 / 权限与脱敏",
+      "dimension_tag": "维度 4：方案完备性检视",
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "missing_type": "敏感数据脱敏机制缺失",
+      "title": "VIP 高管姓名、工号与精确 IP 缺少 RBAC 掩码脱敏",
+      "description": "高管 VIP 全名、工号 45232、精确公网出口 IP 与终端私网 IP 在所有页面均为全明文显示，缺乏基于管理员角色的脱敏机制（如 `何*`、`45***`），存在企业内部安全审计合规风险。",
+      "solution": "根据 RBAC 权限等级配置敏感数据脱敏开关，非审计员/超管角色默认展示星号掩码，支持悬浮验权查看。"
+    },
+    {
+      "scenario_tag": "首页 & 应用详情 / 筛选反馈",
+      "dimension_tag": "维度 4：方案完备性检视",
+      "severity": "p4",
+      "confidence_text": "高置信",
+      "missing_type": "空状态插槽与重置引导缺失",
+      "title": "筛选无结果时仅展示简陋文本，缺少图形插槽与一键重置",
+      "description": "首页表格及应用详情用户明细在组合筛选无匹配数据时，仅呈现简陋的纯文本提示，缺少标准的空状态插槽图文以及一键'清空/重置筛选条件'的引导按钮。",
+      "solution": "配置统一的 `<template #empty>` 空状态组件，并提供高对比度'清空筛选'快捷按钮。"
+    },
+    {
+      "scenario_tag": "用户详情 & 首页 / 响应式适配",
+      "dimension_tag": "维度 4：方案完备性检视",
+      "severity": "p4",
+      "confidence_text": "高置信",
+      "missing_type": "1280px 小分辨率极限尺寸挤压",
+      "title": "小分辨率屏幕下顶部横向信息卡片与表格操作列挤压遮挡",
+      "description": "在 1280x800 等笔记本小屏幕分辨率下，用户详情顶部 4 组信息卡片与横向应用选择槽位出现换行折断，首页表格操作列文字紧贴边框，呼吸感不足。",
+      "solution": "优化媒体查询断点（Media Queries），小屏下顶部卡片采用 2x2 弹性网格排布，表格横向支持平滑滚动并固定操作列。"
     }
   ]
 }
