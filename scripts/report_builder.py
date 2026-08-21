@@ -149,6 +149,84 @@ def build_issue_card(issue, standalone=False):
             </div>
 """
 
+def should_render_as_dim4_table(issues):
+    """
+    判断是否命中「维度 4 批量轻微问题表格化展示规则」：
+    必须同时满足以下 3 项条件：
+    1. 识别问题仅属于维度 4（方案完备性检视）单维度；
+    2. 问题级别均为 P3 / P4 型（无 P1/P2 严重阻塞或高危操作缺失）；
+    3. 问题数量大于 3 个（len(issues) > 3）。
+    """
+    if len(issues) <= 3:
+        return False
+
+    for issue in issues:
+        dim_str = issue.get('dimension_tag', '').lower()
+        if not ('维度 4' in dim_str or '维度4' in dim_str or 'dim4' in dim_str or '完备' in dim_str):
+            return False
+        sev = issue.get('severity', '').lower()
+        if sev not in ('p3', 'p4'):
+            return False
+
+    return True
+
+def build_dim4_table(issues):
+    """生成维度 4 完备性汇总表格 HTML（字段：页面、缺失类型、缺失描述）。"""
+    rows_html = []
+    for idx, issue in enumerate(issues, 1):
+        page = issue.get('scenario_tag') or issue.get('page') or f"模块 {idx}"
+        missing_type = issue.get('missing_type') or issue.get('type')
+        if not missing_type:
+            title = issue.get('title', '')
+            missing_type = title.split('缺失')[0] + '缺失' if '缺失' in title else title
+            if len(missing_type) > 24:
+                missing_type = "全状态/交互完备性"
+
+        desc = issue.get('description', '')
+        sol = issue.get('solution', '')
+        desc_html = f"<p>{desc}</p>"
+        if sol:
+            desc_html += f"<p style='margin-top: 6px; color: var(--accent-primary); font-size: 12px;'><strong>建议：</strong>{sol}</p>"
+
+        sev = issue.get('severity', 'p3').lower()
+        sev_badge = f"<span class='issue-tag tag-{sev}' style='margin-left: 6px;'>{sev.upper()}</span>"
+
+        row = f"""                        <tr>
+                            <td style="width: 25%;">
+                                <span class="dim4-page-badge">{page}</span>
+                                {sev_badge}
+                            </td>
+                            <td style="width: 25%;">
+                                <span class="dim4-type-badge">{missing_type}</span>
+                            </td>
+                            <td style="width: 50%;">
+                                {desc_html}
+                            </td>
+                        </tr>"""
+        rows_html.append(row)
+
+    table_rows = '\n'.join(rows_html)
+    return f"""
+        <section class="dim4-table-section">
+            <h2>📋 维度 4：方案完备性检视缺失清单</h2>
+            <p class="dim4-table-desc">注：经源码与原型静态审查，以下问题均属于维度 4（P3/P4 级）完备性细节缺失项，已按规范统一汇总展示：</p>
+            <div class="dim4-table-wrapper">
+                <table class="dim4-completeness-table">
+                    <thead>
+                        <tr>
+                            <th>页面</th>
+                            <th>缺失类型</th>
+                            <th>缺失描述</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+{table_rows}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+"""
+
 def build_report(data, standalone=False):
     issues = data.get('issues', [])
     project = data.get('project', '未命名项目')
@@ -281,8 +359,11 @@ def build_report(data, standalone=False):
     conclusion_html = data.get('conclusion', '<p style="color: var(--text-dim);">未提供定性检视结论。</p>')
     content = content.replace('{{QUALITATIVE_CONCLUSION}}', conclusion_html)
 
-    # 生成问题列表 HTML
-    issue_list_html = '\n'.join(build_issue_card(issue, standalone=standalone) for issue in issues)
+    # 生成问题列表 HTML：判断是否命中「维度 4 批量 P3/P4 规则」
+    if should_render_as_dim4_table(issues):
+        issue_list_html = build_dim4_table(issues)
+    else:
+        issue_list_html = '\n'.join(build_issue_card(issue, standalone=standalone) for issue in issues)
 
     # 注入问题列表
     start_ph = '<!-- ISSUE_LIST_START -->'
@@ -313,17 +394,25 @@ def self_check(html_content, issues):
     """返回 (检查项名, 是否通过, 说明) 列表。"""
     checks = []
 
-    img_issues = [i for i in issues if i.get('img_file')]
-    noimg_issues = [i for i in issues if not i.get('img_file')]
-    wrapper_count = html_content.count('class="issue-img-wrapper"')
-    placeholder_count = html_content.count('class="issue-img-placeholder"')
-    wrapper_ok = wrapper_count == len(img_issues)
-    placeholder_ok = placeholder_count == len(noimg_issues)
-    checks.append((
-        '问题截图引用',
-        wrapper_ok and placeholder_ok,
-        f'wrapper={wrapper_count}/{len(img_issues)} 占位图={placeholder_count}/{len(noimg_issues)}'
-    ))
+    if should_render_as_dim4_table(issues):
+        has_table = 'class="dim4-completeness-table"' in html_content
+        checks.append((
+            '维度 4 完备性汇总表格',
+            has_table,
+            f'已汇总展示 {len(issues)} 个 P3/P4 问题' if has_table else '表格缺失'
+        ))
+    else:
+        img_issues = [i for i in issues if i.get('img_file')]
+        noimg_issues = [i for i in issues if not i.get('img_file')]
+        wrapper_count = html_content.count('class="issue-img-wrapper"')
+        placeholder_count = html_content.count('class="issue-img-placeholder"')
+        wrapper_ok = wrapper_count == len(img_issues)
+        placeholder_ok = placeholder_count == len(noimg_issues)
+        checks.append((
+            '问题截图引用',
+            wrapper_ok and placeholder_ok,
+            f'wrapper={wrapper_count}/{len(img_issues)} 占位图={placeholder_count}/{len(noimg_issues)}'
+        ))
 
     has_rules = '体验评分与问题等级定性规则' in html_content
     checks.append(('底部评分表', has_rules, '存在' if has_rules else '缺失'))
