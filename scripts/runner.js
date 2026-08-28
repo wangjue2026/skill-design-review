@@ -200,13 +200,30 @@ async function executeAction(page, action, config, resolvedAssetsDir) {
       break;
     }
 
-    case 'type': {
+    case 'type':
+    case 'fill': {
       try {
-        await page.click(action.selector, { clickCount: 3 });
-        await page.type(action.selector, action.value || '');
-        console.log(`  [type] "${action.value}" → ${action.selector}`);
+        const val = action.value || '';
+        // 优先使用 DOM 级注入并派发标准 input/change 事件，确保中文及非 ASCII 字符完美输入并触发前端框架（Alpine/Vue/React）响应式联动
+        const filled = await page.evaluate((sel, text) => {
+          const el = document.querySelector(sel);
+          if (el) {
+            el.focus();
+            el.value = text;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+          return false;
+        }, action.selector, val).catch(() => false);
+
+        if (!filled) {
+          await page.click(action.selector, { clickCount: 3 });
+          await page.type(action.selector, val);
+        }
+        console.log(`  [type/fill] "${val}" → ${action.selector}`);
       } catch (e) {
-        console.warn(`  [type] Failed on "${action.selector}": ${e.message}`);
+        console.warn(`  [type/fill] Failed on "${action.selector}": ${e.message}`);
       }
       break;
     }

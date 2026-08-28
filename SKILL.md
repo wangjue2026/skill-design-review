@@ -181,6 +181,29 @@ AI **绝对不能机械地仅匹配 `browser_subagent` 字符串**，而是必�
    - **分支 1A (原生内置型)**：若 Context 已声明 `browser_subagent`、`chrome_devtools`、`agent_browser` 等原生工具（如 Antigravity / Codex），直接唤起使用，无需安装任何依赖。
    - **分支 1B (按需安装型)**：若 Context **无**原生浏览器工具但具备命令行权限，AI 自动在终端执行全局安装通用的浏览器 Agent 工具（例如：`npm install -g agent-browser`），安装完成后通过该通用工具进行自然语言操控。
 2. **自然语言探索与走查**：以测试角色视角，通过自然语言操控浏览器工具模拟真实操作链路（如“点击顶部筛选栏”、“切换至体验预警页”、“展开诊断详情 Drawer”）。
+
+   - **🔒 中文字符与非 ASCII 文本输入强制协议 (Chinese & Non-ASCII Input Protocol)**：
+     * **核心禁止项**：严禁直接向底层按键模拟工具（如 `browser_press_key` / `keyboard.press` 等底层物理按键 API）传入中文字符或非 ASCII 文本。此类工具底层仅支持物理键码，输入中文会抛出 `Unknown key` 异常；**严禁因报错而擅自降级输入拼音（如输入 `liuyang`）**。因为 B 端业务原型与真实系统的搜索/筛选逻辑多为精准匹配中文字符串，输入拼音无法命中过滤项，会导致走查流程断裂并产生虚假的“搜不到/无数据/功能缺失”误判。
+     * **标准输入规程 (Input SOP)**：
+       1. **方案 A（DOM 注入与事件派发，推荐默认）**：聚焦目标输入框，直接设置 `inputElement.value = '待输入中文'`，并立即派发标准事件触发前端响应式监听：
+          ```javascript
+          const el = document.querySelector('input-selector');
+          el.focus();
+          el.value = '刘洋';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          ```
+       2. **方案 B（框架响应式状态直接驱动）**：针对 Alpine.js (`Alpine.$data`)、Vue 或 React 页面，可直接在浏览器上下文中修改对应的响应式数据字段（如 `Alpine.$data(el).searchUser = '刘洋'`）。
+       3. **方案 C（剪贴板粘贴）**：将中文字符写入剪贴板后模拟快捷键粘贴。
+
+   - **🔒 大体积富交互 DOM 页面防超时与精准查询协议 (Large DOM Resilience Protocol)**：
+     * **核心禁止项**：严禁对包含数千个节点、复杂内联 SVG、大量 Alpine.js 状态与全量 Mock 数据的大型页面盲目执行整页全量 DOM dump/序列化（如频繁调用可能超时的全树抓取工具），防止触发底层通信超时阻断走查。
+     * **标准查询规程**：优先采用精准 CSS/XPath 选择器定向提取关键组件容器（卡片、表格行、弹窗、抽屉），结合局部视觉快照与坐标读取（`getBoundingClientRect`）高效推进。
+
+   - **🔒 Subagent 任务下发强制约束注入 (Subagent Prompting Standard)**：
+     * 当主 Agent 唤起 `browser_subagent` 或下发浏览器子任务时，**必须在任务 Prompt 中显式包含以下硬约束**：
+       1. “【中文输入硬约束】：输入中文/搜索时严禁使用物理按键模拟（绝对不得出现输入拼音的情况），必须通过 DOM 注入（`el.value = '...'` 并 dispatch `input`/`change` 事件）精准输入中文并触发联动”；
+       2. “【精准查询硬约束】：避免整页全量 dump 庞大 DOM 树导致超时，优先通过定向选择器定位元素、执行点击与捕获局部快照”。
 3. **静态扫描与动态实证结合 (Hybrid Inspection Protocol)**：
    - **静态逻辑扫描 (维度 4 优先模式)**：【维度 4：方案完备性检视】**暂仅限代码/原型结构审查 (Code-Only Review)**。AI 直接扫描源码/DOM 结构中的 `loading` 骨架屏、`empty` 插槽、`show-overflow-tooltip` 文本截断、`confirm` 防错弹窗及 `try/catch` 报错拦截等代码标记，快速秒级完成完备性排查。**必须对照 `references/06_方案完备性检视Checklist.md` 的 12 类项目逐项打勾并输出「已覆盖/未覆盖」清单，禁止用关键词计数代替逐项核查。**
    - **动态浏览器实证**：主要用于【维度 1】主任务流程跑通与关键交互视觉实证，避免在浏览器中机械模拟复杂的极端边界操作。
@@ -395,4 +418,6 @@ AI 检视发现的问题数量**不设任何上限，且实行严格的无条件
 19. 设定固定数量槽位（如潜意识限定 5/6 个卡片），在多轮对话或问题补充时替换/覆盖已有问题（违反 Append-Only 纯追加制）。
 20. 执行维度 2 审视时未识别需求所属业务场景类型（排障/配置/运营/终端），未进行针对性场景化高维负向拷问，或将微观控件/路由参数问题错挂为维度 2。
 21. 将维度 4（方案完备性检视）发现的多个独立状态缺陷（如 Deep Linking 状态持久化、骨架屏、敏感数据脱敏、空状态插槽、响应式适配等）打包合并为一个“集合型大卡片”。每个独立的完备性缺陷必须作为独立条目录入（One Issue Per Defect）；当维度 4 P3/P4 缺陷数量 $\ge 4$ 个时，必须按规范汇总为高密度表格呈现。
+22. 在浏览器走查中对中文字符使用底层键盘敲击模拟导致 `Unknown key` 报错并擅自降级为拼音搜索；或在未正确注入中文与派发 input/change 事件的情况下误判搜索/过滤功能失效。
+23. 对大体积 DOM 页面盲目调用全量 DOM 序列化/dump 导致通信超时阻塞，未采用定向选择器或局部快照推进走查。
 
