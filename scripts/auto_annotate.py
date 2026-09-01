@@ -5,8 +5,14 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 def load_annotation_font(size=24):
-    """Load a font that can render Chinese labels on macOS and common Linux setups."""
+    """Load a font that can render Chinese labels on Windows, macOS and common Linux setups."""
     font_paths = [
+        # Windows Chinese fonts
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/msyh.ttf",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
         # macOS Chinese fonts
         "/System/Library/Fonts/PingFang.ttc",
         "/System/Library/Fonts/STHeiti Medium.ttc",
