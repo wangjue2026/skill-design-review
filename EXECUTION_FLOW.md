@@ -57,6 +57,8 @@ description: 设计检视执行流程单（Execution Runbook）—— SKILL.md �
 请确认要检视哪些维度（或回复「全量」）；确认前不会开始走查。
 ```
 
+> 💡 **快速确认机制**：若用户首句已提供完整信息（维度 + 目标/剧本/背景），初步判断直接对齐用户意图，并在底部提示 *“已捕获完整前置信息，回复「确认」即可立即开始”*。
+
 📌 详细规则：`SKILL.md §1.1`（默认分开执行；只有用户明确「全量」才全量执行）
 
 ---
@@ -174,9 +176,9 @@ description: 设计检视执行流程单（Execution Runbook）—— SKILL.md �
 ---
 
 **↓ 步骤 E：同步批注截图（在当前界面关闭前完成，不得事后补做）**
-- [ ] 记录视口尺寸与 `devicePixelRatio`
-- [ ] 用 `getBoundingClientRect` 获取问题区域 CSS 坐标
-- [ ] 坐标 × dpr → 调用 `scripts/auto_annotate.py <截图> '<json批注>'` → 落图至 `Reports/assets`
+- [ ] 提取物理像素坐标（含 `devicePixelRatio` 与页面/容器 `scrollX/Y` 换算）：
+  `x1 = Math.round((rect.left + window.scrollX) * dpr)`，`y1 = Math.round((rect.top + window.scrollY) * dpr)`
+- [ ] 运行脚本落图：调用 `python3 scripts/auto_annotate.py <截图> '<json批注>'` → 保存至 `Reports/assets`
 
 > ⛔ **重复操作熔断（3 次上限）**：任意操作失败最多重试 3 次：
 > - 截图 / 批注失败 → 标准占位图，附注「截图获取失败·已熔断（3次）」
@@ -259,6 +261,8 @@ description: 设计检视执行流程单（Execution Runbook）—— SKILL.md �
 3. `加载态骨架屏 (Skeleton)` 与局部 Spin 遮罩
 4. `零数据空白态插槽` 与清空重置行动引导
 5. `极值边界与超长文本 Tooltip 完整覆盖`
+
+> 💡 **前端 Demo 状态快速切换**：若需获取特定异常/空白态截图，可直接通过浏览器 `evaluate` 修改 Alpine/Vue 响应式变量快速呈现，无需机械模拟后端造数。
 
 > ⛔ **严禁敷衍凑数**：严禁仅抓一个 Tooltip 截断等 P4 视觉瑕疵来敷衍维度 4；非满分结论必须指出系统级结构性缺陷。
 > 
