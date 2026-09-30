@@ -7,6 +7,12 @@
   "persona": "<测试角色，例如：企业管理员 / 运维工程师 / 财务审核员>",
   "date": "2026-08-14",
 
+  "score_history": {
+    "_comment": "【答辩模式专用字段·可选】初审得分 < 60 分触发答辩复议后填写",
+    "defense_triggered": true,
+    "initial_score": 48.5
+  },
+
   "dimensions": {
     "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
     "dim1_content": "执行【<核心主任务剧本名称>】走查测试，验证是否达成【<设定的体验目标>】",
@@ -36,6 +42,7 @@
       "scenario_tag": "<所在场景/模块>",
       "dimension_tag": "<维度 1：体验目标达成 / 维度 2 / 维度 3 / 维度 4>",
       "severity": "p2",
+      "original_severity": "p1",
       "confidence_text": "高置信",
       "title": "<纯设计体验语言描述的问题标题>",
       "related_task": "<用户尝试完成的真实业务任务>",
@@ -43,7 +50,14 @@
       "alternative_path_check": "<页面是否存在替代路径，以及替代路径的摩擦成本>",
       "description": "<问题详细描述（严禁底层 HTML/CSS 代码词汇，使用设计与体验语言）>",
       "business_impact": "<对业务流转、任务效率、决策误导造成的具体影响>",
-      "solution": "<具体可落地的体验与交互改进建议方案>"
+      "solution": "<具体可落地的体验与交互改进建议方案>",
+      "defense": {
+        "_comment": "【答辩模式复议记录·可选】status 支持：waived(采纳免责) / downgraded(降级折衷) / rejected(驳回维持)",
+        "status": "downgraded",
+        "user_argument": "<用户针对扣分的辩解陈述、业务约束或客观背景说明>",
+        "re_verification_fact": "<AI 进行二次实证走查发现的客观事实（如有必要时走查）>",
+        "reviewer_verdict": "<资深设计师视角仲裁意见与驳回/采纳依据>"
+      }
     }
   ]
 }

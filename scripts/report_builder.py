@@ -39,11 +39,38 @@ P4_CAP = 3.0
 #  评分计算
 # ──────────────────────────────────────────────────────────────
 
-def calculate_score(issues):
+def calculate_initial_score(issues):
+    """计算答辩前的原始初评得分（基于 original_severity 或 severity，忽略答辩豁免）。"""
     score = 100.0
     p4_deducted = 0.0
 
     for issue in issues:
+        sev = issue.get('original_severity') or issue.get('severity', '')
+        sev = sev.lower()
+        deduction = SEVERITY_DEDUCTIONS.get(sev, 0.0)
+
+        if sev == 'p4':
+            actual = min(deduction, max(0.0, P4_CAP - p4_deducted))
+            p4_deducted += actual
+            score -= actual
+        else:
+            score -= deduction
+
+    return max(0.0, score)
+
+def calculate_score(issues):
+    """计算最终得分（支持答辩采纳免责与降级生效）。"""
+    score = 100.0
+    p4_deducted = 0.0
+
+    for issue in issues:
+        defense = issue.get('defense')
+        if defense:
+            status = defense.get('status', '').lower()
+            # 答辩采纳免责：扣分清零
+            if status in ('waived', 'passed', 'accepted'):
+                continue
+
         sev = issue.get('severity', '').lower()
         deduction = SEVERITY_DEDUCTIONS.get(sev, 0.0)
 
@@ -106,6 +133,58 @@ def build_issue_card(issue, standalone=False):
                         </div>
                         <p class="image-caption">{issue.get('image_caption', '说明：经源码静态检视，该状态组件在原型中未被定义或未提供独立渲染视图')}</p>"""
 
+    # 答辩复议板块渲染
+    defense_html = ""
+    tag_defense_html = ""
+    defense = issue.get('defense')
+    if defense:
+        status_raw = defense.get('status', 'rejected').lower()
+        if status_raw in ('waived', 'passed', 'accepted'):
+            status_key = 'waived'
+            status_text = '🟢 答辩采纳 · 免除扣分'
+            tag_defense_html = '<span class="issue-tag tag-defense-waived">答辩免责</span>'
+        elif status_raw in ('downgraded', 'demoted'):
+            status_key = 'downgraded'
+            orig_sev = (issue.get('original_severity') or 'P1').upper()
+            curr_sev = sev.upper()
+            status_text = f'🟡 答辩折衷 · 降级处理 ({orig_sev} ➔ {curr_sev})'
+            tag_defense_html = '<span class="issue-tag tag-defense-downgraded">答辩降级</span>'
+        else:
+            status_key = 'rejected'
+            status_text = '🔴 答辩驳回 · 维持原判扣分'
+            tag_defense_html = '<span class="issue-tag tag-defense-rejected">答辩驳回</span>'
+
+        re_verif_html = ""
+        re_fact = defense.get('re_verification_fact') or defense.get('re_verification_action')
+        if re_fact:
+            re_verif_html = f"""
+                        <div class="defense-block re-verification">
+                            <h5>🔍 二次实证走查事实</h5>
+                            <p>{re_fact}</p>
+                        </div>"""
+
+        defense_html = f"""
+                <div class="defense-panel defense-status-{status_key}">
+                    <div class="defense-header">
+                        <div class="defense-title-group">
+                            <span class="defense-icon">⚖️</span>
+                            <strong>设计答辩与复议记录</strong>
+                        </div>
+                        <span class="defense-status-badge">{status_text}</span>
+                    </div>
+                    <div class="defense-content-grid">
+                        <div class="defense-block user-argument">
+                            <h5>👤 答辩陈述与业务事实</h5>
+                            <p>{defense.get('user_argument', '—')}</p>
+                        </div>
+                        {re_verif_html}
+                        <div class="defense-block reviewer-verdict">
+                            <h5>🏛️ 资深设计师复议裁决</h5>
+                            <p>{defense.get('reviewer_verdict', '—')}</p>
+                        </div>
+                    </div>
+                </div>"""
+
     return f"""
             <div class="issue-card">
                 <div class="tag-group">
@@ -113,6 +192,7 @@ def build_issue_card(issue, standalone=False):
                     <span class="issue-tag tag-dimension">{issue.get('dimension_tag', '')}</span>
                     <span class="issue-tag tag-{sev}">{SEVERITY_DISPLAY.get(sev, sev.upper())}</span>
                     <span class="issue-tag tag-confidence">{issue.get('confidence_text', '高置信')}</span>
+                    {tag_defense_html}
                 </div>
                 <h3 class="issue-title">{issue.get('title', '')}</h3>
                 <div class="issue-evidence-grid">
@@ -146,6 +226,7 @@ def build_issue_card(issue, standalone=False):
                         </div>
                     </div>
                 </div>
+                {defense_html}
             </div>
 """
 
@@ -234,13 +315,23 @@ def build_report(data, standalone=False):
     persona = data.get('persona', '—')
     date_str = data.get('date', datetime.now().strftime('%Y-%m-%d'))
 
-    # 统计
-    p1 = sum(1 for i in issues if i.get('severity', '').lower() == 'p1')
-    p2 = sum(1 for i in issues if i.get('severity', '').lower() == 'p2')
-    p3 = sum(1 for i in issues if i.get('severity', '').lower() == 'p3')
-    p4 = sum(1 for i in issues if i.get('severity', '').lower() == 'p4')
+    # 统计有效问题（答辩采纳免责的问题不计入扣分统计）
+    def is_waived(i):
+        return i.get('defense', {}).get('status', '').lower() in ('waived', 'passed', 'accepted')
+
+    p1 = sum(1 for i in issues if i.get('severity', '').lower() == 'p1' and not is_waived(i))
+    p2 = sum(1 for i in issues if i.get('severity', '').lower() == 'p2' and not is_waived(i))
+    p3 = sum(1 for i in issues if i.get('severity', '').lower() == 'p3' and not is_waived(i))
+    p4 = sum(1 for i in issues if i.get('severity', '').lower() == 'p4' and not is_waived(i))
     total = len(issues)
     score = calculate_score(issues)
+
+    # 答辩与双轨得分逻辑
+    score_hist = data.get('score_history', {})
+    has_defense = score_hist.get('defense_triggered', False) or any(i.get('defense') for i in issues)
+    initial_score = score_hist.get('initial_score')
+    if initial_score is None:
+        initial_score = calculate_initial_score(issues) if has_defense else score
 
     # 读取模板
     if not os.path.exists(TEMPLATE_PATH):
@@ -260,6 +351,18 @@ def build_report(data, standalone=False):
     content = content.replace('{{P2_COUNT}}', str(p2))
     content = content.replace('{{P3_COUNT}}', str(p3))
     content = content.replace('{{P4_COUNT}}', str(p4))
+
+    # 替换答辩评分相关占位符
+    if has_defense:
+        content = content.replace('{{SCORE_BADGE_CLASS}}', ' has-defense')
+        content = content.replace('{{SCORE_LABEL}}', '体验评分 · 复议终审')
+        content = content.replace('{{SCORE_SUB_HTML}}', f'<span class="initial-score-tag" title="答辩前初评得分">初评 {initial_score:.1f}</span>')
+        content = content.replace('{{SCORE_DEFENSE_TAG}}', '<div class="defense-stamp-badge">已完成答辩复议</div>')
+    else:
+        content = content.replace('{{SCORE_BADGE_CLASS}}', '')
+        content = content.replace('{{SCORE_LABEL}}', '体验评分')
+        content = content.replace('{{SCORE_SUB_HTML}}', '')
+        content = content.replace('{{SCORE_DEFENSE_TAG}}', '')
     
     # 4 大维度定性结果标准字典与样式映射
     VALID_DIM_ENUMS = {
@@ -455,6 +558,15 @@ def self_check(html_content, issues):
 
     has_rules = '体验评分与问题等级定性规则' in html_content
     checks.append(('底部评分表', has_rules, '存在' if has_rules else '缺失'))
+
+    defense_issues = [i for i in issues if i.get('defense')]
+    if defense_issues:
+        panel_count = html_content.count('class="defense-panel')
+        checks.append((
+            '答辩复议记录面板',
+            panel_count == len(defense_issues),
+            f'已渲染 {panel_count}/{len(defense_issues)} 个复议记录'
+        ))
 
     return checks
 
