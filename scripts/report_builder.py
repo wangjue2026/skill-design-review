@@ -22,12 +22,11 @@ from datetime import datetime
 # ──────────────────────────────────────────────────────────────
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_PATH = os.path.join(SCRIPT_DIR, '..', 'references', '05_HTML检视报告模板.html')
+TEMPLATE_PATH = os.path.join(SCRIPT_DIR, '..', 'references', '04_HTML检视报告模板.html')
 REPORTS_DIR = os.path.join(SCRIPT_DIR, '..', 'Reports')
 
 # 扣分规则
 SEVERITY_DEDUCTIONS = {
-    'p1': 10.0,
     'p2': 5.0,
     'p3': 2.0,
     'p4': 0.5,
@@ -88,7 +87,6 @@ def calculate_score(issues):
 # ──────────────────────────────────────────────────────────────
 
 SEVERITY_DISPLAY = {
-    'p1': 'P1 - 严重',
     'p2': 'P2 - 较重',
     'p3': 'P3 - 轻微',
     'p4': 'P4 - 瑕疵',
@@ -145,7 +143,7 @@ def build_issue_card(issue, standalone=False):
             tag_defense_html = '<span class="issue-tag tag-defense-waived">答辩免责</span>'
         elif status_raw in ('downgraded', 'demoted'):
             status_key = 'downgraded'
-            orig_sev = (issue.get('original_severity') or 'P1').upper()
+            orig_sev = (issue.get('original_severity') or 'P2').upper()
             curr_sev = sev.upper()
             status_text = f'🟡 答辩折衷 · 降级处理 ({orig_sev} ➔ {curr_sev})'
             tag_defense_html = '<span class="issue-tag tag-defense-downgraded">答辩降级</span>'
@@ -235,7 +233,7 @@ def should_render_as_dim4_table(issues):
     判断是否命中「维度 4 批量轻微问题表格化展示规则」：
     必须同时满足以下 3 项条件：
     1. 识别问题仅属于维度 4（方案完备性检视）单维度；
-    2. 问题级别均为 P3 / P4 型（无 P1/P2 严重阻塞或高危操作缺失）；
+    2. 问题级别均为 P3 / P4 型（无 P2 严重阻塞或高危操作缺失）；
     3. 问题数量大于 3 个（len(issues) > 3）。
     """
     if len(issues) <= 3:
@@ -319,7 +317,6 @@ def build_report(data, standalone=False):
     def is_waived(i):
         return i.get('defense', {}).get('status', '').lower() in ('waived', 'passed', 'accepted')
 
-    p1 = sum(1 for i in issues if i.get('severity', '').lower() == 'p1' and not is_waived(i))
     p2 = sum(1 for i in issues if i.get('severity', '').lower() == 'p2' and not is_waived(i))
     p3 = sum(1 for i in issues if i.get('severity', '').lower() == 'p3' and not is_waived(i))
     p4 = sum(1 for i in issues if i.get('severity', '').lower() == 'p4' and not is_waived(i))
@@ -347,7 +344,6 @@ def build_report(data, standalone=False):
     content = content.replace('{{PERSONA}}', persona)
     content = content.replace('{{DATE}}', date_str)
     content = content.replace('{{SCORE}}', f'{score:.1f}')
-    content = content.replace('{{P1_COUNT}}', str(p1))
     content = content.replace('{{P2_COUNT}}', str(p2))
     content = content.replace('{{P3_COUNT}}', str(p3))
     content = content.replace('{{P4_COUNT}}', str(p4))
@@ -437,12 +433,10 @@ def build_report(data, standalone=False):
             issue_count_str = "0"
             issue_count_cls = "issue-count-zero"
         else:
-            p1_c = sev_list.count('P1')
             p2_c = sev_list.count('P2')
             p3_c = sev_list.count('P3')
             p4_c = sev_list.count('P4')
             parts = []
-            if p1_c: parts.append(f"{p1_c}个 P1")
             if p2_c: parts.append(f"{p2_c}个 P2")
             if p3_c: parts.append(f"{p3_c}个 P3")
             if p4_c: parts.append(f"{p4_c}个 P4")
@@ -503,7 +497,7 @@ def build_report(data, standalone=False):
             if sec_end != -1:
                 content = content[:sec_start] + content[sec_end + len('</section>'):]
 
-    return content, score, total, p1, p2, p3, p4
+    return content, score, total, p2, p3, p4
 
 # ──────────────────────────────────────────────────────────────
 #  准出自检（报告生成后强制校验）
@@ -610,7 +604,7 @@ if __name__ == '__main__':
 
     # 1. 生成普通版本（引用外部资产图片）
     if not standalone_only:
-        html_content, score, total, p1, p2, p3, p4 = build_report(data, standalone=False)
+        html_content, score, total, p2, p3, p4 = build_report(data, standalone=False)
         output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
         output_path = os.path.join(REPORTS_DIR, output_filename)
         os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -624,7 +618,7 @@ if __name__ == '__main__':
             print(f'     {mark} {name}: {note}')
 
     # 2. 生成 Standalone 版本（图片 Base64 内联）
-    html_content_standalone, score, total, p1, p2, p3, p4 = build_report(data, standalone=True)
+    html_content_standalone, score, total, p2, p3, p4 = build_report(data, standalone=True)
     output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'
     output_path_standalone = os.path.join(REPORTS_DIR, output_filename_standalone)
     os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -632,5 +626,5 @@ if __name__ == '__main__':
         f.write(html_content_standalone)
     print(f'✅ Standalone Report generated: {output_path_standalone}')
 
-    print(f'   Total issues : {total} (P1:{p1} P2:{p2} P3:{p3} P4:{p4})')
+    print(f'   Total issues : {total} (P2:{p2} P3:{p3} P4:{p4})')
     print(f'   Score        : {score:.1f} / 100')

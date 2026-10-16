@@ -3,7 +3,8 @@
   "_howto": "运行命令: python3 scripts/report_builder.py scripts/configs/this_file.json",
 
   "project": "<项目/模块名称，例如：智能仓储管理系统 / SASE 全球加速>",
-  "scenario": "<检视场景，例如：核心看板 / 批量订单配置 / 节点拓扑管理>",
+  "scenario": "<检视场景，例如：核心看板 / 批量订单配置 / 节点拓扑管理>〔取证执行器：独立浏览器窗口 · 实测视口 1440×900 CSS px @DPR 2〕",
+  "_scenario_note": "Tier 1 必须按 SKILL.md §0.2 在 scenario 末尾追加取证环境标记（取证执行器 + 实测视口 W×H CSS px + DPR），Tier 2 降级模式可省略",
   "persona": "<测试角色，例如：企业管理员 / 运维工程师 / 财务审核员>",
   "date": "2026-08-14",
 
@@ -41,8 +42,8 @@
       "image_caption": "<图注说明：说明截图区域及问题位置>",
       "scenario_tag": "<所在场景/模块>",
       "dimension_tag": "<维度 1：体验目标达成 / 维度 2 / 维度 3 / 维度 4>",
-      "severity": "p2",
-      "original_severity": "p1",
+      "severity": "p3",
+      "original_severity": "p2",
       "confidence_text": "高置信",
       "title": "<纯设计体验语言描述的问题标题>",
       "related_task": "<用户尝试完成的真实业务任务>",

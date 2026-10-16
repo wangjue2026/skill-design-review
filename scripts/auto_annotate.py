@@ -129,7 +129,7 @@ def annotate_image(image_path, annotations, output_path=None):
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python auto_annotate.py <image_path> '<json_annotations>'")
-        print("Example: python auto_annotate.py screen.png '[{\"rect\": [10, 10, 100, 100], \"label\": \"P1-严重\", \"color\": \"red\"}]'")
+        print("Example: python auto_annotate.py screen.png '[{\"rect\": [10, 10, 100, 100], \"label\": \"P2-较重\", \"color\": \"orange\"}]'")
     else:
         path = sys.argv[1]
         data = json.loads(sys.argv[2])

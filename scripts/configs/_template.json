@@ -41,8 +41,8 @@
           },
           {
             "selector": "text/关键文字",
-            "label": "[P1-严重] 严重问题描述",
-            "color": "red"
+            "label": "[P3-轻微] 轻微问题描述",
+            "color": "green"
           }
         ]
       }
