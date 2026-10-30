@@ -1,0 +1,7 @@
+# design-review 技能包的 Python 依赖
+#
+# browser_runner.py 与 report_builder.py 零第三方依赖，仅需 Python 3.8+ 标准库；
+# 只有图片批注脚本 auto_annotate.py 需要 Pillow（用于在截图上画框与等级标签）。
+#
+# 如本次检视不做截图批注，可不安装。
+pillow>=9.0.0

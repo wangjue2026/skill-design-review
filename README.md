@@ -19,7 +19,9 @@
 - `Reports/`: **产出目录**。生成的 HTML 报告及 `assets` 截图资源存放地。
 - `scripts/`: **自动化工具箱**。
   - `auto_annotate.py`: 图片标注底层画笔，在浏览器走查模式下对截图进行框选、等级标签批注，落图至 `Reports/assets`。
-  - `report_builder.py`: 通用报告生成器，读取问题 JSON（按 `configs/_template_issues.json` 格式）并结合模板生成结构化 HTML 检视报告，内置评分计算、枚举白名单校验与准出自检。
+  - `browser_runner.py`: **跨平台浏览器走查执行器**（零第三方依赖，纯标准库 + 本机已有 Chromium），通过 CDP 拉起独立窗口并执行 `setviewport / navigate / click / hover / type / scroll / key / eval / shot / wait`；交互走真实输入管线（`isTrusted=true`、有命中测试），并回传 `hit_self` / `blocked_by` 作为「按钮被遮挡」的直接证据。
+  - `report_builder.py`: 通用报告生成器，读取问题 JSON（按 `configs/_template_issues.json` 空壳模板填写）并结合模板生成结构化 HTML 检视报告，内置评分计算、schema 校验、枚举白名单校验、**截图存在性校验**与准出自检；校验不通过以非零退出码拒绝出报告（`2` = 数据校验失败，`3` = 准出自检失败），`--no-strict` 可临时放宽。
+  - `configs/`: issues JSON 模板与历史样例（`_template_issues.json` 为纯空壳，不含任何示例数值）。
 
 ## 🎯 四大检视维度与执行顺序规程
 - **维度选择式执行（默认分开）**：默认不自动全量检视，启动时输出维度选择卡片（说明各维度范围与意图）并给出初步判断，由用户确认要检视的维度；只有用户明确「全量」才同时执行全部 4 个维度。
@@ -30,11 +32,12 @@
 - **报告生成**: 生成包含截图批注、严格 P2-P4 定级（最下方附带业务后果判定表）与四维定性结论的专业报告。
 
 ## 🛠️ 环境依赖与安装
-本工具包的批注脚本需要 Python 环境支持：
 
-1. **安装 Python 依赖** (用于底层图像标注):
+- `browser_runner.py` 与 `report_builder.py` **零第三方依赖**：只需 Python 3.8+ 标准库，以及本机已存在的 Chromium 系浏览器（Chrome / Edge / Chromium / Chrome for Testing）。
+- 仅图片批注脚本 `auto_annotate.py` 需要 Pillow：
+
    ```bash
-   pip install pillow
+   pip install -r requirements.txt   # 等价于 pip install pillow
    ```
 
 ## 🚀 两阶环境自适应工作流 (2-Tier Adaptive Routing)

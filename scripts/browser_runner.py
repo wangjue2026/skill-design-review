@@ -270,6 +270,8 @@ class CDPPage:
     def __init__(self, ws_url, timeout=30):
         self.ws = MiniWebSocket(ws_url, timeout=timeout)
         self._id = 0
+        # 当前视口 (w, h, dpr, mobile)：整页截图后按它复原，批注坐标也依赖 DPR 一致
+        self._viewport = None
 
     def call(self, method, params=None, timeout=60):
         self._id += 1
@@ -311,29 +313,59 @@ class CDPPage:
             'width': int(width), 'height': int(height),
             'deviceScaleFactor': float(dpr), 'mobile': bool(mobile),
         })
+        self._viewport = (int(width), int(height), float(dpr), bool(mobile))
 
-    def navigate(self, url, wait=1.5):
+    def navigate(self, url, wait=1.5, timeout=20):
+        """导航并等待页面真正就绪，返回是否在超时内达到 complete。
+
+        旧实现死等固定秒数，慢页面会截到白屏——这是「假证据」最常见的来源。
+        现改为轮询 document.readyState，timeout 到点即放行（不无限等），
+        wait 作为就绪后的额外渲染余量。
+        """
         self.call('Page.enable')
         self.call('Page.navigate', {'url': url})
-        time.sleep(wait)
+        ready = False
+        deadline = time.time() + float(timeout)
+        while time.time() < deadline:
+            try:
+                state = self.evaluate('return document.readyState')
+            except (RuntimeError, TimeoutError):
+                state = None
+            if state == 'complete':
+                ready = True
+                break
+            time.sleep(0.15)
+        time.sleep(max(0.0, float(wait)))
+        return ready
 
     def screenshot(self, out_path, full_page=False):
         params = {'format': 'png'}
+        restore = None
         if full_page:
-            # 取整页尺寸后再截，避免部分后端 fullPage 不生效
+            # 取整页尺寸后再截，避免部分后端 fullPage 不生效。
+            # 关键：整页截图必须沿用「当前 DPR」放大。旧实现强制 1x，而批注坐标按
+            # 页面 devicePixelRatio 计算，两边不一致会让批注框整体偏移、大小翻倍。
             metrics = self.evaluate(
                 "return JSON.stringify({w:document.documentElement.scrollWidth,"
-                "h:document.documentElement.scrollHeight})"
+                "h:document.documentElement.scrollHeight,"
+                "dpr:devicePixelRatio||1})"
             )
             try:
                 m = json.loads(metrics)
+                dpr = float(m.get('dpr') or (self._viewport[2] if self._viewport else 1))
                 self.call('Emulation.setDeviceMetricsOverride', {
                     'width': int(m['w']), 'height': int(m['h']),
-                    'deviceScaleFactor': 1, 'mobile': False,
+                    'deviceScaleFactor': dpr, 'mobile': False,
                 })
+                restore = self._viewport
             except (ValueError, TypeError, KeyError):
                 pass
             r = self.call('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': True})
+            if restore:
+                self.call('Emulation.setDeviceMetricsOverride', {
+                    'width': restore[0], 'height': restore[1],
+                    'deviceScaleFactor': restore[2], 'mobile': restore[3],
+                })
         else:
             r = self.call('Page.captureScreenshot', params)
 
@@ -344,6 +376,221 @@ class CDPPage:
         with open(out_path, 'wb') as f:
             f.write(base64.b64decode(data))
         return out_path
+
+    # ── 真实输入原语（走 CDP Input 域：isTrusted=true、有命中测试、触发 :hover/:active）──
+    #
+    # 为什么不用 eval + el.click()：
+    #   JS 合成点击 isTrusted=false，不经过命中测试，能点中用户实际点不到的按钮
+    #   （被遮罩覆盖、pointer-events:none、视觉禁用但未设 disabled），
+    #   既会漏检「点了没反应」，也会触发不了 :hover/:active 与输入前置校验。
+    #   这里统一走 Input.dispatchMouseEvent / Input.insertText，并把命中结果回传成证据。
+
+    def element_info(self, selector, scroll=True):
+        """返回元素视口坐标、可见性、禁用态，以及该点命中的真实元素（用于判遮挡）。"""
+        sel = _normalize_selector(selector)
+        if not sel:
+            raise ValueError('selector 不能为空')
+        script = (
+            "const el = document.querySelector(%s);"
+            "if (!el) return JSON.stringify({found:false});"
+            "%s"
+            "const r = el.getBoundingClientRect();"
+            "const cs = getComputedStyle(el);"
+            "const cx = r.left + r.width / 2, cy = r.top + r.height / 2;"
+            "const hit = document.elementFromPoint(cx, cy);"
+            "return JSON.stringify({"
+            "found:true,"
+            "x:r.left, y:r.top, w:r.width, h:r.height, cx:cx, cy:cy,"
+            "visible:!!(r.width||r.height)&&cs.visibility!=='hidden'&&cs.display!=='none',"
+            "disabled:el.disabled===true||el.getAttribute('aria-disabled')==='true',"
+            "pointerEvents:cs.pointerEvents,"
+            "tag:el.tagName.toLowerCase(),"
+            "text:(el.innerText||el.value||'').trim().slice(0,60),"
+            "hitSelf:!!hit&&(hit===el||el.contains(hit)),"
+            "hitTag:hit?hit.tagName.toLowerCase():null,"
+            "hitCls:hit?String(hit.className||'').slice(0,80):null,"
+            "hitText:hit?(hit.innerText||'').trim().slice(0,40):null,"
+            "vw:innerWidth, vh:innerHeight"
+            "});"
+        ) % (_js_str(sel), "el.scrollIntoView({block:'center',inline:'center'});" if scroll else '')
+        raw = self.evaluate(script)
+        info = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        if not info.get('found'):
+            raise RuntimeError('元素未找到：%s' % sel)
+        return info
+
+    def hit_test(self, x, y):
+        """返回视口某点命中的最上层元素（判断是否被遮罩/浮层挡住的直接证据）。"""
+        raw = self.evaluate(
+            "const el = document.elementFromPoint(%d, %d);"
+            "if (!el) return JSON.stringify({found:false});"
+            "return JSON.stringify({found:true, tag:el.tagName.toLowerCase(),"
+            "cls:String(el.className||'').slice(0,80), id:el.id||'',"
+            "text:(el.innerText||'').trim().slice(0,40)});" % (int(round(x)), int(round(y)))
+        )
+        return json.loads(raw) if isinstance(raw, str) else (raw or {})
+
+    def hover(self, selector, scroll=True):
+        info = self.element_info(selector, scroll=scroll)
+        self.call('Input.dispatchMouseEvent', {
+            'type': 'mouseMoved', 'x': info['cx'], 'y': info['cy'],
+            'button': 'none', 'buttons': 0,
+        })
+        return _action_result(selector, info, 'hover')
+
+    def click(self, selector, button='left', click_count=1, scroll=True):
+        """真实鼠标点击。返回命中信息：hit_self=False 即「用户点不到」，可直接作为问题证据。"""
+        info = self.element_info(selector, scroll=scroll)
+        cx, cy = info['cx'], info['cy']
+        self.call('Input.dispatchMouseEvent', {
+            'type': 'mouseMoved', 'x': cx, 'y': cy, 'button': 'none', 'buttons': 0,
+        })
+        self.call('Input.dispatchMouseEvent', {
+            'type': 'mousePressed', 'x': cx, 'y': cy,
+            'button': button, 'buttons': 1, 'clickCount': int(click_count),
+        })
+        self.call('Input.dispatchMouseEvent', {
+            'type': 'mouseReleased', 'x': cx, 'y': cy,
+            'button': button, 'buttons': 0, 'clickCount': int(click_count),
+        })
+        return _action_result(selector, info, 'click')
+
+    def type_text(self, selector, text, clear=False, scroll=True):
+        """真实文本输入：真实点击聚焦 → Input.insertText（中英文均走真实输入管线）。
+
+        键盘输入依赖页面处于激活态，故先 bringToFront；
+        若点击后仍未聚焦（部分环境抢不到前台），退化为显式 focus 并在结果里标注
+        focus_fallback=true，保证「输入是否走了真实点击聚焦」不被静默掩盖。
+        """
+        sel = _normalize_selector(selector)
+        info = self.element_info(sel, scroll=scroll)
+        try:
+            self.call('Page.bringToFront')
+            # 窗口在后台时渲染进程会跳过 focus 的默认行为，导致输入落不到输入框。
+            # CDP 的焦点模拟专治此症：让页面"以为"自己处于激活态，输入才真实送达。
+            self.call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        except (RuntimeError, TimeoutError):
+            pass
+
+        # 聚焦优先由真实点击完成，否则部分框架的 focus 态与失焦校验不会触发
+        self.click(sel, scroll=False)
+        focused = self.evaluate(
+            "const el = document.querySelector(%s);"
+            "return !!el && document.activeElement === el;" % _js_str(sel)
+        )
+        focus_fallback = False
+        if not focused:
+            self.evaluate(
+                "const el = document.querySelector(%s);"
+                "if (el && el.focus) el.focus();"
+                "return true;" % _js_str(sel)
+            )
+            focus_fallback = True
+
+        if clear:
+            self.evaluate(
+                "const el = document.querySelector(%s);"
+                "if (el) { el.value = '';"
+                "el.dispatchEvent(new Event('input', {bubbles:true})); }"
+                "return true;" % _js_str(sel)
+            )
+
+        self.call('Input.insertText', {'text': str(text)})
+
+        value = self.evaluate(
+            "const el = document.querySelector(%s);"
+            "if (!el) return '';"
+            "return (el.value !== undefined && el.value !== null) ? String(el.value) : (el.innerText || '');"
+            % _js_str(sel)
+        )
+        result = _action_result(selector, info, 'type')
+        result['value'] = value
+        result['focused'] = self.evaluate(
+            "const el = document.querySelector(%s);"
+            "return !!el && document.activeElement === el;" % _js_str(sel)
+        )
+        result['focus_fallback'] = focus_fallback
+        return result
+
+    def scroll(self, selector=None, dy=0, dx=0, scroll=True):
+        """真实滚轮滚动；给 selector 时先滚到该元素，再以元素中心为滚轮落点。"""
+        if selector:
+            info = self.element_info(selector, scroll=scroll)
+            x, y = info['cx'], info['cy']
+        else:
+            x = self.evaluate('return Math.floor(innerWidth / 2);')
+            y = self.evaluate('return Math.floor(innerHeight / 2);')
+        self.call('Input.dispatchMouseEvent', {
+            'type': 'mouseWheel', 'x': int(x), 'y': int(y),
+            'deltaX': int(dx), 'deltaY': int(dy),
+        })
+        return {'op': 'scroll', 'selector': selector, 'point': [x, y],
+                'deltaX': dx, 'deltaY': dy,
+                'scrollY': self.evaluate('return Math.round(scrollY);')}
+
+    def press_key(self, key):
+        """真实按键（Enter / Escape / Tab / Backspace 等），用于提交、关闭浮层与打断校验。"""
+        code, vk, text = _KEY_MAP.get(key, (key, 0, None))
+        payload = {'type': 'keyDown', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk,
+                   'nativeVirtualKeyCode': vk}
+        if text:
+            payload['text'] = text
+            payload['unmodifiedText'] = text
+        self.call('Input.dispatchKeyEvent', payload)
+        self.call('Input.dispatchKeyEvent', {
+            'type': 'keyUp', 'key': key, 'code': code,
+            'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk,
+        })
+        return {'op': 'key', 'key': key}
+
+
+# CDP Input.dispatchKeyEvent 的常用键映射：key → (code, windowsVirtualKeyCode, text)
+_KEY_MAP = {
+    'Enter': ('Enter', 13, '\r'),
+    'Escape': ('Escape', 27, None),
+    'Tab': ('Tab', 9, None),
+    'Backspace': ('Backspace', 8, None),
+    'Delete': ('Delete', 46, None),
+    ' ': ('Space', 32, ' '),
+    'ArrowUp': ('ArrowUp', 38, None),
+    'ArrowDown': ('ArrowDown', 40, None),
+    'ArrowLeft': ('ArrowLeft', 37, None),
+    'ArrowRight': ('ArrowRight', 39, None),
+}
+
+
+def _normalize_selector(selector):
+    """支持纯 CSS 选择器与 `css:` 前缀写法。"""
+    s = str(selector or '').strip()
+    if s.lower().startswith('css:'):
+        s = s[4:].strip()
+    return s
+
+
+def _js_str(value):
+    """生成安全的 JS 字符串字面量（JSON 字符串在 JS 中合法，避免引号注入）。"""
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def _action_result(selector, info, op):
+    """把元素信息整理成走查结果：hit_self=False 时直接给出被谁挡住。"""
+    blocked = None
+    if not info.get('hitSelf'):
+        blocked = {
+            'tag': info.get('hitTag'),
+            'class': info.get('hitCls'),
+            'text': info.get('hitText'),
+        }
+    return {
+        'op': op,
+        'selector': _normalize_selector(selector),
+        'point': [round(info.get('cx', 0), 1), round(info.get('cy', 0), 1)],
+        'visible': info.get('visible'),
+        'disabled': info.get('disabled'),
+        'pointer_events': info.get('pointerEvents'),
+        'hit_self': info.get('hitSelf'),
+        'blocked_by': blocked,
+    }
 
 
 # ──────────────────────────────────────────────────────────────
@@ -622,33 +869,77 @@ def _run_ops(page, ops):
     支持的操作：
       {"op":"setviewport","width":1440,"height":900,"dpr":2}
       {"op":"navigate","url":"https://...","wait":1.5}
-      {"op":"eval","script":"return ...","name":"结果键名"}
+      {"op":"click","selector":"css:.filter-btn"}            # 真实鼠标点击，回传命中检测
+      {"op":"hover","selector":"css:.row-3"}                  # 真实 mouseMoved，触发 :hover
+      {"op":"type","selector":"css:#kw","text":"刘洋","clear":true}   # 真实点击聚焦 + insertText
+      {"op":"scroll","selector":"css:.table-body","dy":600}   # 真实滚轮
+      {"op":"key","key":"Enter"}                              # 真实按键
+      {"op":"eval","script":"return ...","name":"结果键名"}    # 兜底：仅用于取值/构造特殊态
       {"op":"shot","out":"Reports/assets/x.png","full_page":false}
       {"op":"wait","seconds":1.0}
+
+    单个操作失败不会中断整段序列（否则一次误点会毁掉全部取证），
+    失败项统一记入 results['errors']，页面未就绪记入 results['warnings']，
+    由走查方决定是否降级/熔断。
     """
     results = {}
     for idx, item in enumerate(ops):
         op = (item.get('op') or '').lower()
-        if op == 'setviewport':
-            page.set_viewport(item.get('width', 1440), item.get('height', 900),
-                              item.get('dpr', 1))
-            results['viewport'] = json.loads(page.evaluate(
-                "return JSON.stringify({iw:innerWidth,ih:innerHeight,dpr:devicePixelRatio})"
-            ))
-        elif op == 'navigate':
-            page.navigate(item['url'], wait=item.get('wait', 1.5))
-            results.setdefault('navigations', []).append(item['url'])
-        elif op == 'eval':
-            value = page.evaluate(item['script'])
-            results[item.get('name') or ('eval_%d' % idx)] = value
-        elif op == 'shot':
-            results.setdefault('shots', []).append(
-                page.screenshot(item['out'], full_page=item.get('full_page', False))
-            )
-        elif op == 'wait':
-            time.sleep(float(item.get('seconds', 1.0)))
-        else:
-            results.setdefault('skipped', []).append(op or '(空)')
+        try:
+            if op == 'setviewport':
+                page.set_viewport(item.get('width', 1440), item.get('height', 900),
+                                  item.get('dpr', 1))
+                results['viewport'] = json.loads(page.evaluate(
+                    "return JSON.stringify({iw:innerWidth,ih:innerHeight,dpr:devicePixelRatio})"
+                ))
+            elif op == 'navigate':
+                ready = page.navigate(item['url'], wait=item.get('wait', 1.5),
+                                     timeout=item.get('timeout', 20))
+                results.setdefault('navigations', []).append(item['url'])
+                if not ready:
+                    results.setdefault('warnings', []).append({
+                        'index': idx, 'op': 'navigate', 'url': item['url'],
+                        'note': '超时内未达到 readyState=complete，截图可能空白/半渲染，需人工确认',
+                    })
+            elif op == 'click':
+                results.setdefault('actions', []).append(
+                    page.click(item['selector'],
+                               button=item.get('button', 'left'),
+                               click_count=item.get('click_count', 1),
+                               scroll=item.get('scroll', True))
+                )
+            elif op == 'hover':
+                results.setdefault('actions', []).append(
+                    page.hover(item['selector'], scroll=item.get('scroll', True))
+                )
+            elif op == 'type':
+                results.setdefault('actions', []).append(
+                    page.type_text(item['selector'], item.get('text', ''),
+                                   clear=item.get('clear', False),
+                                   scroll=item.get('scroll', True))
+                )
+            elif op == 'scroll':
+                results.setdefault('actions', []).append(
+                    page.scroll(selector=item.get('selector'),
+                                dy=item.get('dy', 0), dx=item.get('dx', 0))
+                )
+            elif op == 'key':
+                results.setdefault('actions', []).append(page.press_key(item.get('key', 'Enter')))
+            elif op == 'eval':
+                value = page.evaluate(item['script'])
+                results[item.get('name') or ('eval_%d' % idx)] = value
+            elif op == 'shot':
+                results.setdefault('shots', []).append(
+                    page.screenshot(item['out'], full_page=item.get('full_page', False))
+                )
+            elif op == 'wait':
+                time.sleep(float(item.get('seconds', 1.0)))
+            else:
+                results.setdefault('skipped', []).append(op or '(空)')
+        except Exception as e:
+            results.setdefault('errors', []).append({
+                'index': idx, 'op': op, 'selector': item.get('selector'), 'error': str(e),
+            })
     return results
 
 

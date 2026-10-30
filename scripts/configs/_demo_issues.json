@@ -1,0 +1,70 @@
+{
+  "_README": [
+    "【可跑样例】用于验证 report_builder.py 的渲染、评分与准出自检链路是否正常。",
+    "运行：python3 scripts/report_builder.py scripts/configs/_demo_issues.json",
+    "预期：exit 0，在 Reports/ 下生成两份报告（普通版 + standalone 版），得分 97.5。",
+    "本样例刻意不引用真实截图（img_file 留空，走占位图分支），因此 clone 后无需任何图片资产即可跑通。"
+  ],
+
+  "project": "样例：SASE 控制台告警中心",
+  "scenario": "告警列表筛选与批量处理〔取证执行器：独立浏览器窗口 · 实测视口 1440×900 CSS px @DPR 2〕",
+  "persona": "安全运营工程师",
+  "date": "",
+
+  "issues": [
+    {
+      "img_file": "",
+      "image_caption": "示例：建议在筛选栏与列表之间补充已选条件回显",
+      "scenario_tag": "告警中心 · 列表",
+      "dimensions": [1],
+      "severity": "p3",
+      "confidence_text": "高置信",
+      "title": "（样例）复合筛选条件提交后无回显，用户需重新展开面板确认",
+      "related_task": "按时间范围与告警等级筛选目标告警，并确认当前筛选口径",
+      "tried_path": "打开告警列表 → 展开筛选面板 → 选择时间范围与等级 → 点击查询 → 观察列表顶部条件区",
+      "alternative_path_check": "可再次展开筛选面板查看已选项，但会遮挡列表，且多一次展开操作",
+      "description": "筛选提交后页面未以标签形式回显已选条件，用户无法在列表态直接确认当前筛选口径；跨页返回后更容易误判数据范围。",
+      "business_impact": "排查时需反复展开面板核对条件，增加确认成本；跨页返回后容易把局部数据误读为全量。",
+      "solution": "在列表顶部以带删除图标的标签回显已选条件，并提供一键清空。"
+    },
+    {
+      "img_file": "",
+      "image_caption": "示例：批量操作需给出成功/失败汇总与逐条原因",
+      "scenario_tag": "告警中心 · 批量操作",
+      "dimensions": [3],
+      "severity": "p4",
+      "confidence_text": "高置信",
+      "title": "（样例）批量关闭告警缺少结果汇总，部分失败时无逐条原因",
+      "related_task": "批量处理多条告警，并确认每一条的处理结果",
+      "tried_path": "勾选多条告警 → 点击批量关闭 → 观察提示反馈与列表状态",
+      "alternative_path_check": "可逐条查看列表状态变化，但条数多时需人工比对，不可行",
+      "description": "批量操作完成后仅给出整体成功提示，未区分成功与失败条目，失败原因不可见。",
+      "business_impact": "部分失败时用户误以为全部成功，遗漏的告警会持续产生噪音并带来漏判风险。",
+      "solution": "补充混合结果汇总：成功 N 条、失败 M 条，失败条目可展开查看原因并支持重试。"
+    }
+  ],
+
+  "dimensions": {
+    "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
+    "dim1_content": "执行【筛选目标告警并确认筛选口径】走查，验证筛选结果是否可在列表态直接确认",
+    "dim1_result": "基础达成",
+    "dim1_explanation": "主链路可走通，但筛选条件回显缺失增加了确认成本，判为基础达成。",
+
+    "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
+    "dim2_content": "样例不涉及方案级审视",
+    "dim2_result": "未显式走查",
+    "dim2_explanation": "样例仅用于验证报告渲染链路，不做方案级判断。",
+
+    "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
+    "dim3_content": "匹配公共子维度 3（认知、反馈与防错）：批量操作结果反馈与部分失败处理",
+    "dim3_result": "基本通过，有优化空间",
+    "dim3_explanation": "常规交互基本合规，批量操作的结果汇总与失败原因呈现存在优化空间。",
+
+    "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
+    "dim4_content": "样例不涉及静态完备性扫描",
+    "dim4_result": "未显式走查",
+    "dim4_explanation": "样例不含维度 4 检视。"
+  },
+
+  "hypotheses": []
+}

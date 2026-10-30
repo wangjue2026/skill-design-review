@@ -1,64 +1,68 @@
 {
-  "_comment": "review_issues.json 模板 — AI 检视分析完成后填写，report_builder.py 读取生成 HTML 报告",
-  "_howto": "运行命令: python3 scripts/report_builder.py scripts/configs/this_file.json",
+  "_README": [
+    "【空壳模板】本文件不含任何示例数值，所有字段均为空，避免示例值被当成真实结论写进报告。",
+    "用法：复制为 scripts/configs/<项目>_issues.json 后逐项填写；不要直接运行本模板。",
+    "运行：python3 scripts/report_builder.py scripts/configs/<项目>_issues.json",
+    "脚本会先做 schema 校验（字段缺失 / 级别非法 / 截图文件不存在 / 枚举越界 / 结论与问题数矛盾），校验不通过直接非零退出，不会生成报告。",
+    "若本次确实零问题：删除下面 issues 里的骨架对象，把 issues 置为 []，并把四维结论改为白名单满分词（超预期达成 / 达成 / 符合 / 通过 / 完备）。"
+  ],
 
-  "project": "<项目/模块名称，例如：智能仓储管理系统 / SASE 全球加速>",
-  "scenario": "<检视场景，例如：核心看板 / 批量订单配置 / 节点拓扑管理>〔取证执行器：独立浏览器窗口 · 实测视口 1440×900 CSS px @DPR 2〕",
-  "_scenario_note": "Tier 1 必须按 SKILL.md §0.2 在 scenario 末尾追加取证环境标记（取证执行器 + 实测视口 W×H CSS px + DPR），Tier 2 降级模式可省略",
-  "persona": "<测试角色，例如：企业管理员 / 运维工程师 / 财务审核员>",
-  "date": "2026-08-14",
-
-  "score_history": {
-    "_comment": "【答辩模式专用字段·可选】初审得分 < 60 分触发答辩复议后填写",
-    "defense_triggered": true,
-    "initial_score": 48.5
+  "_field_docs": {
+    "issues[].dimensions": "【必填】整数数组，取值 1 / 2 / 3 / 4，一个问题只归属一个最贴切维度（互斥，禁止同一问题写多个维度）。维度 1 体验目标达成 / 2 产品理念契合度 / 3 常规交互 Checklist / 4 方案完备性。",
+    "issues[].severity": "【必填】p2 | p3 | p4（小写）。",
+    "issues[].confidence_text": "【必填】高置信 | 中置信。中置信不得定为 p2；「待验证假设」不得进入 issues，请移入 hypotheses。",
+    "issues[].img_file": "【必填】Reports/assets 下真实存在的文件名（含扩展名）。仅当该问题确实无界面证据时留空，此时渲染占位图。文件名写错或文件缺失会被校验拦下。",
+    "issues[].original_severity": "【仅答辩降级时填】且必须同时填写 defense 记录，否则会被误算为答辩前更高级别。",
+    "dimensions.dimN_result": "【必填】白名单枚举，禁止同义词。维度 1：超预期达成 / 达成 / 基础达成 / 未达成 / 未显式走查；维度 2：符合 / 基本符合，有优化空间 / 部分符合 / 不符合 / 未显式走查；维度 3：通过 / 基本通过，有优化空间 / 基础达成 / 未达成 / 未显式走查；维度 4：完备 / 基本完备，存在边缘缺失 / 完备性不足 / 严重缺失 / 未显式走查。",
+    "dimensions.dimN_explanation": "【必填】一句话说明该维度结论依据，不罗列具体问题。",
+    "score_history.initial_score": "【仅答辩后填】必须等于脚本按 original_severity 重算的初评分，偏差会被告警。",
+    "hypotheses": "【可选】待验证假设数组，不参与评分扣分，单独渲染在附录区；结构同 issues，但不需要 severity。"
   },
 
-  "dimensions": {
-    "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
-    "dim1_content": "执行【<核心主任务剧本名称>】走查测试，验证是否达成【<设定的体验目标>】",
-    "dim1_result": "基础达成",
-    "dim1_explanation": "<一句话说明主干链路跑通情况及关键阻塞/摩擦点依据>",
-
-    "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
-    "dim2_content": "理解业务需求背景，结合走查测试，评估是否存在更高维的需求与设计解法",
-    "dim2_result": "部分符合",
-    "dim2_explanation": "<一句话说明与设计原则/产品愿景的对齐情况>",
-
-    "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
-    "dim3_content": "匹配 Checklist 中表单行内校验、二次确认防错、操作反馈等子维度",
-    "dim3_result": "通过",
-    "dim3_explanation": "<一句话说明常规交互与防错机制的合规情况>",
-
-    "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
-    "dim4_content": "对全量 demo/原型代码进行全状态（空白/加载/报错/极端临界）交互细节扫描",
-    "dim4_result": "完备性不足",
-    "dim4_explanation": "<一句话说明全状态与环境自适应覆盖情况>"
-  },
+  "project": "",
+  "scenario": "",
+  "persona": "",
+  "date": "",
 
   "issues": [
     {
-      "img_file": "<截图文件名，若确实无截图可填 ''，会自动渲染统一占位图>",
-      "image_caption": "<图注说明：说明截图区域及问题位置>",
-      "scenario_tag": "<所在场景/模块>",
-      "dimension_tag": "<维度 1：体验目标达成 / 维度 2 / 维度 3 / 维度 4>",
-      "severity": "p3",
-      "original_severity": "p2",
+      "img_file": "",
+      "image_caption": "",
+      "scenario_tag": "",
+      "dimensions": [],
+      "severity": "",
       "confidence_text": "高置信",
-      "title": "<纯设计体验语言描述的问题标题>",
-      "related_task": "<用户尝试完成的真实业务任务>",
-      "tried_path": "<AI 实际尝试的操作点击与排查链路>",
-      "alternative_path_check": "<页面是否存在替代路径，以及替代路径的摩擦成本>",
-      "description": "<问题详细描述（严禁底层 HTML/CSS 代码词汇，使用设计与体验语言）>",
-      "business_impact": "<对业务流转、任务效率、决策误导造成的具体影响>",
-      "solution": "<具体可落地的体验与交互改进建议方案>",
-      "defense": {
-        "_comment": "【答辩模式复议记录·可选】status 支持：waived(采纳免责) / downgraded(降级折衷) / rejected(驳回维持)",
-        "status": "downgraded",
-        "user_argument": "<用户针对扣分的辩解陈述、业务约束或客观背景说明>",
-        "re_verification_fact": "<AI 进行二次实证走查发现的客观事实（如有必要时走查）>",
-        "reviewer_verdict": "<资深设计师视角仲裁意见与驳回/采纳依据>"
-      }
+      "title": "",
+      "related_task": "",
+      "tried_path": "",
+      "alternative_path_check": "",
+      "description": "",
+      "business_impact": "",
+      "solution": ""
     }
-  ]
+  ],
+
+  "dimensions": {
+    "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
+    "dim1_content": "",
+    "dim1_result": "未显式走查",
+    "dim1_explanation": "",
+
+    "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
+    "dim2_content": "",
+    "dim2_result": "未显式走查",
+    "dim2_explanation": "",
+
+    "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
+    "dim3_content": "",
+    "dim3_result": "未显式走查",
+    "dim3_explanation": "",
+
+    "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
+    "dim4_content": "",
+    "dim4_result": "未显式走查",
+    "dim4_explanation": ""
+  },
+
+  "hypotheses": []
 }

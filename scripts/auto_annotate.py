@@ -119,6 +119,8 @@ def annotate_image(image_path, annotations, output_path=None):
             base, ext = os.path.splitext(image_path)
             output_path = f"{base}_annotated{ext}"
 
+        out_dir = os.path.dirname(os.path.abspath(output_path))
+        os.makedirs(out_dir, exist_ok=True)
         img.save(output_path)
         print(f"Successfully saved annotated image to: {output_path}")
         return output_path
@@ -126,11 +128,40 @@ def annotate_image(image_path, annotations, output_path=None):
     except Exception as e:
         print(f"An error occurred: {e}")
 
+DEFAULT_OUT_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'Reports', 'assets'
+)
+
+
+def resolve_output_path(image_path, out=None):
+    """批注图默认落到 Reports/assets（与 SKILL.md §3 批注 SOP 一致）。
+
+    out 允许是目录（自动沿用 `<原图名>_annotated.<ext>`）或完整文件路径。
+    """
+    stem, ext = os.path.splitext(os.path.basename(image_path))
+    default_name = '%s_annotated%s' % (stem, ext or '.png')
+    if not out:
+        return os.path.join(DEFAULT_OUT_DIR, default_name)
+    if os.path.isdir(out) or out.endswith(os.sep) or out.endswith('/'):
+        return os.path.join(out, default_name)
+    return out
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python auto_annotate.py <image_path> '<json_annotations>'")
-        print("Example: python auto_annotate.py screen.png '[{\"rect\": [10, 10, 100, 100], \"label\": \"P2-较重\", \"color\": \"orange\"}]'")
-    else:
-        path = sys.argv[1]
-        data = json.loads(sys.argv[2])
-        annotate_image(path, data)
+    argv = sys.argv[1:]
+    if len(argv) < 2:
+        print("Usage: python3 auto_annotate.py <image_path> '<json_annotations>' [--out <file_or_dir>]")
+        print("Example: python3 auto_annotate.py screen.png "
+              "'[{\"rect\": [10, 10, 100, 100], \"label\": \"P2-较重\", \"color\": \"orange\"}]'")
+        print("默认输出：Reports/assets/<原图名>_annotated.<ext>")
+        sys.exit(1)
+
+    out = None
+    if '--out' in argv:
+        i = argv.index('--out')
+        out = argv[i + 1] if i + 1 < len(argv) else None
+        argv = argv[:i] + argv[i + 2:]
+
+    path = argv[0]
+    data = json.loads(argv[1])
+    annotate_image(path, data, resolve_output_path(path, out))
