@@ -16,12 +16,13 @@
   - `03_体验愿景.md`: 通用体验愿景基准与四大核心场景理念映射矩阵。
   - `04_HTML检视报告模板.html`: 报告生成模板。
   - `05_方案完备性检视Checklist.md`: 方案完备性与全状态矩阵（正常/空白/加载/报错/极端边界）专项 Checklists。
-- `Reports/`: **产出目录**。生成的 HTML 报告及 `assets` 截图资源存放地。
+- `Reports/`: **产出根目录**。每个任务一个子目录（`Reports/<任务>_<日期>/`），内含报告 HTML、`assets/` 截图与批注图、`ledger.json` 过程账本、`ops/` 操作序列 —— 一次任务的所有产物收敛在一起，不再平铺在根目录；目录整体不进入版本控制。
 - `scripts/`: **自动化工具箱**。
   - `auto_annotate.py`: 图片标注底层画笔，在浏览器走查模式下对截图进行框选、等级标签批注，落图至 `Reports/assets`。
   - `browser_runner.py`: **跨平台浏览器走查执行器**（零第三方依赖，纯标准库 + 本机已有 Chromium），通过 CDP 拉起独立窗口并执行 `setviewport / navigate / click / hover / type / scroll / key / eval / shot / wait`；交互走真实输入管线（`isTrusted=true`、有命中测试），并回传 `hit_self` / `blocked_by` 作为「按钮被遮挡」的直接证据。
   - `report_builder.py`: 通用报告生成器，读取问题 JSON（按 `configs/_template_issues.json` 空壳模板填写）并结合模板生成结构化 HTML 检视报告，内置评分计算、schema 校验、枚举白名单校验、**截图存在性校验**与准出自检；校验不通过以非零退出码拒绝出报告（`2` = 数据校验失败，`3` = 准出自检失败，`4` = 过程账本仍有未完成项），`--no-strict` 可临时放宽。
   - `ledger.py`: **过程账本工具**（防丢档）。把「证据 ↔ 结论」的绑定关系落盘到 `Reports/<任务>_<日期>/ledger.json`，支持 `init / add / apply / status / check / summary`；原子写 + 自动 `.bak`，中断后可按 `pending` 条目断点续跑；`check` 是有 pending 即非零退出的门禁。
+  - `migrate_reports.py`: 一次性迁移脚本，把早期平铺在 `Reports/` 根下的报告（含 `_standalone` 版本）收进 `Reports/<报告名>/` 并把其引用的截图复制到同目录 `assets/`；支持 `--dry-run` 先看计划。
   - `configs/`: issues JSON 模板与历史样例（`_template_issues.json` 为纯空壳，不含任何示例数值）。
 
 ## 🎯 四大检视维度与执行顺序规程

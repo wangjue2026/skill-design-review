@@ -196,15 +196,19 @@ description: 设计检视执行流程单（Execution Runbook）—— SKILL.md �
 
 > 过去证据账本、已发现问题、未覆盖清单只存在于对话上下文中：一旦上下文压缩或会话中断，「截图还在磁盘、但截图证明了什么已经丢了」。因此每次检视必须在任务目录下落盘。
 
-**任务目录结构**（`ledger.py init` 自动创建）：
+**任务目录结构**（**一次任务 = 一个目录**，报告 / 截图 / 过程记录全部收敛在内，不再平铺在 `Reports/` 根下）：
 
 ```
 Reports/<任务名>_<日期>/
+  ├─ <任务名>_设计检视报告_<日期>.html             标准版报告（以相对路径引用同目录 assets/）
+  ├─ <任务名>_设计检视报告_<日期>_standalone.html  单文件版（图片 Base64 内联）
+  ├─ issues.json        检视结论定稿（由 issues_draft.json 改名而来）
   ├─ ledger.json        过程账本（证据 ↔ 结论的绑定关系，原子写 + 自动 .bak）
-  ├─ issues_draft.json  候选问题，边发现边追加（格式兼容 report_builder.py）
   ├─ ops/               ops 序列（可原样重跑）
   └─ assets/            截图与批注图
 ```
+
+> 🚫 **禁止再往 `Reports/` 根目录平铺报告与截图**。早期平铺报告已可用 `python3 scripts/migrate_reports.py --dry-run` 预览、去掉 `--dry-run` 一次性迁入各自任务目录（按报告名建目录、复制其引用的截图，HTML 相对引用无需改动）。
 
 **常用命令**：
 
@@ -374,7 +378,7 @@ python3 scripts/ledger.py summary --dir …                              # 生�
 
 ### □ Step 3.1 — 生成结构化报告
 
-- [ ] **Tier 1**：按 `scripts/configs/_template_issues.json` 格式整理 issues JSON → 运行 `python3 scripts/report_builder.py <issues_json> --ledger <任务目录>` 生成 HTML 报告
+- [ ] **Tier 1**：把定稿的 `issues.json` 放进任务目录 → 运行 `python3 scripts/report_builder.py <任务目录>/issues.json --ledger <任务目录>` 生成 HTML 报告；**报告、截图、过程记录全部留在该任务目录内**（不传 `--ledger` / `--out-dir` 时会自动建 `Reports/<项目>_<日期>/`）
 - [ ] **Tier 2 降级**：生成 Markdown 报告，头部显式声明降级原因
 - [ ] **取证环境（Tier 1 必填）**：在 issues JSON 的 `scenario` 字段末尾追加 `〔取证执行器：… · 实测视口 W×H CSS px @DPR n〕`
 - [ ] 每个正式问题卡片包含全部 10 项字段（*若命中维度 4 批量 P3/P4 规则，以表格汇总呈现*）

@@ -318,7 +318,7 @@ Reports/<任务名>_<日期>/
    - **维度 4 常规取图阶梯规范（包含 P2 或数量 $\le$ 3 时）**：
      * **优先推荐（方案 A）**：截取该模块在**正常态下的界面截图**，并在图上对缺失/缺陷区域进行框选与批注（如框选表格主体，图注说明*“经静态代码检视未包含空状态插槽”*）。
      * **保底策略（方案 B）**：若确实无法获取界面截图或关联界面不存在，**严格保留原双栏对齐布局**，左侧截图区使用统一占位图展示：`截图未获取或此问题关联界面不存在`（附注：`代码静态审查 · 状态未定义`），保证全篇报告布局节奏连贯统一。
-7. **生成 HTML 报告**：按 `scripts/configs/_template_issues.json` 的格式整理问题与四维结论为 issues JSON，运行 `python3 scripts/report_builder.py <issues_json>` 生成结构化 HTML 报告（脚本内置评分计算、枚举白名单校验、维度 4 批量表格化与准出自检，保证报告结构不漂移）；若用户明确要求 Markdown，才输出结构化 Markdown 版本。报告头部需引用快照或截图证据，**最下方附带问题等级定性解释表**。
+7. **生成 HTML 报告**：按 `scripts/configs/_template_issues.json` 的格式整理问题与四维结论为 issues JSON，运行 `python3 scripts/report_builder.py <issues_json> --ledger <任务目录>` 生成结构化 HTML 报告（报告与截图统一落在该任务目录内）（脚本内置评分计算、枚举白名单校验、维度 4 批量表格化与准出自检，保证报告结构不漂移）；若用户明确要求 Markdown，才输出结构化 Markdown 版本。报告头部需引用快照或截图证据，**最下方附带问题等级定性解释表**。
 
 ---
 
@@ -399,7 +399,7 @@ AI 检视发现的问题数量**不设任何上限，且实行严格的无条件
 >    const x2 = Math.round((rect.right + window.scrollX) * dpr);
 >    const y2 = Math.round((rect.bottom + window.scrollY) * dpr);
 >    ```
-> 2. **调用脚本落图**：将坐标作为 JSON 传入 `python3 scripts/auto_annotate.py <截图路径> '[{"rect": [x1, y1, x2, y2], "label": "P2-较重", "color": "orange"}]'` 落图到 `Reports/assets`。批注须在走查阶段同步完成，不得最后补做。
+> 2. **调用脚本落图**：将坐标作为 JSON 传入 `python3 scripts/auto_annotate.py <截图路径> '<json批注>' --dir <任务目录>`，落图到 `<任务目录>/assets`（与报告同目录，报告用相对路径 `assets/…` 引用）。批注须在走查阶段同步完成，不得最后补做。
 > 3. **3 次熔断保底**：若坐标提取或批注失败达 3 次，自动降级为使用无批注原图配合文字图注，并在过程备忘中记录，严禁阻断走查。
 
 ### 🛡️ P2 强制举证防线规程 (P2 Challenge Protocol)

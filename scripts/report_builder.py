@@ -17,6 +17,7 @@ import sys
 import html
 import json
 import base64
+import shutil
 from datetime import datetime
 
 # ──────────────────────────────────────────────────────────────
@@ -244,15 +245,48 @@ def read_ledger(ledger_dir):
 #  证据与维度归属解析
 # ──────────────────────────────────────────────────────────────
 
-def asset_path(img_file):
-    """返回截图在 Reports/assets 下的绝对路径；文件名留空时返回空串。"""
+def asset_path(img_file, assets_dir=None):
+    """返回截图路径；文件名留空时返回空串。
+
+    assets_dir 默认指向 `<任务目录>/assets`（由 main 传入）；未指定时回退到
+    历史全局目录 `Reports/assets`，兼容早期平铺结构的报告。
+    """
     name = str(img_file or '').strip()
-    return os.path.join(ASSETS_DIR, name) if name else ''
+    if not name:
+        return ''
+    return os.path.join(assets_dir or ASSETS_DIR, name)
 
 
-def asset_exists(img_file):
-    p = asset_path(img_file)
+def asset_exists(img_file, assets_dir=None):
+    p = asset_path(img_file, assets_dir)
     return bool(p) and os.path.exists(p)
+
+
+def collect_assets(issues, assets_dir):
+    """把引用了、但还留在历史全局 `Reports/assets` 里的截图收拢到任务目录。
+
+    目的：让「一次任务一个目录」对历史数据也成立 —— 老 issues JSON 重跑时，
+    图片自动被复制进 `<任务目录>/assets`，报告用相对路径即可自包含，不会断链。
+    """
+    os.makedirs(assets_dir, exist_ok=True)
+    copied = []
+    for issue in issues or []:
+        if not isinstance(issue, dict):
+            continue
+        name = str(issue.get('img_file') or '').strip()
+        if not name or os.path.basename(name) != name:
+            continue
+        dst = os.path.join(assets_dir, name)
+        if os.path.exists(dst):
+            continue
+        src = os.path.join(ASSETS_DIR, name)
+        if os.path.exists(src):
+            try:
+                shutil.copyfile(src, dst)
+                copied.append(name)
+            except OSError as e:
+                print(f'[Warning] 收拢截图失败 {name}: {e}')
+    return copied
 
 
 def resolve_dimensions(issue):
@@ -300,7 +334,7 @@ def count_dim_issues(issues):
 #  准出前的 schema 校验（errors 非空则拒绝出报告）
 # ──────────────────────────────────────────────────────────────
 
-def validate_dataset(data):
+def validate_dataset(data, assets_dir=None):
     """报告生成前的数据校验，返回 (errors, warnings)。
 
     errors 非空必须阻止出报告：一份带假分数、断链截图或矛盾结论的 HTML 报告，
@@ -364,7 +398,7 @@ def validate_dataset(data):
         if img:
             if os.path.basename(img) != img:
                 errors.append(f'{prefix}.img_file 只能是纯文件名（禁止路径分隔符）：{img!r}')
-            elif not asset_exists(img):
+            elif not asset_exists(img, assets_dir):
                 errors.append(
                     f'{prefix}.img_file=`{img}` 在 Reports/assets 下不存在'
                     f'（正式问题必须绑定有效截图；确实无界面证据请留空）'
@@ -464,10 +498,10 @@ def _dimension_label(issue):
         return ''
     return ' + '.join(DIM_NAMES.get(d, '维度 %d' % d) for d in dims)
 
-def build_issue_card(issue, standalone=False):
+def build_issue_card(issue, standalone=False, assets_dir=None):
     img_file = str(issue.get('img_file') or '').strip()
     sev = str(issue.get('severity') or 'p3').lower()
-    img_path = asset_path(img_file) if img_file else ''
+    img_path = asset_path(img_file, assets_dir) if img_file else ''
     img_exists = bool(img_path) and os.path.exists(img_path)
 
     img_url = ''
@@ -686,7 +720,7 @@ def build_dim4_table(issues):
         </section>
 """
 
-def build_report(data, standalone=False, coverage_html=''):
+def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     issues = data.get('issues', [])
     project = data.get('project', '未命名项目')
     scenario = data.get('scenario', '—')
@@ -800,11 +834,15 @@ def build_report(data, standalone=False, coverage_html=''):
     if dim4_p3p4_issues:
         rendered_parts = []
         if card_issues:
-            rendered_parts.append('\n'.join(build_issue_card(issue, standalone=standalone) for issue in card_issues))
+            rendered_parts.append('\n'.join(
+                build_issue_card(issue, standalone=standalone, assets_dir=assets_dir)
+                for issue in card_issues))
         rendered_parts.append(build_dim4_table(dim4_p3p4_issues))
         issue_list_html = '\n'.join(rendered_parts)
     else:
-        issue_list_html = '\n'.join(build_issue_card(issue, standalone=standalone) for issue in issues)
+        issue_list_html = '\n'.join(
+            build_issue_card(issue, standalone=standalone, assets_dir=assets_dir)
+            for issue in issues)
 
     # 注入问题列表
     start_ph = '<!-- ISSUE_LIST_START -->'
@@ -838,7 +876,7 @@ def build_report(data, standalone=False, coverage_html=''):
 #  准出自检（报告生成后强制校验）
 # ──────────────────────────────────────────────────────────────
 
-def self_check(html_content, issues):
+def self_check(html_content, issues, assets_dir=None):
     """准出自检。返回 (检查项名, 是否通过, 说明) 列表；任一项 False 即阻止交付。
 
     与旧实现的区别：截图不再只数 DOM 里的字符串出现次数（那样断链图也会通过），
@@ -850,7 +888,7 @@ def self_check(html_content, issues):
         return bool(str(i.get('img_file') or '').strip())
 
     def usable(i):
-        return declared(i) and asset_exists(i.get('img_file'))
+        return declared(i) and asset_exists(i.get('img_file'), assets_dir)
 
     dim4_batch, card_issues = split_dim4_batch(issues)
     rendered = card_issues if dim4_batch else list(issues)
@@ -860,7 +898,7 @@ def self_check(html_content, issues):
     checks.append((
         '截图证据文件存在',
         not missing,
-        '全部命中 Reports/assets' if not missing
+        '全部命中任务目录 assets' if not missing
         else f'{len(missing)} 个引用文件缺失：{", ".join(missing[:5])}'
     ))
 
@@ -914,6 +952,7 @@ if __name__ == '__main__':
     issues_path = None
     slug = None
     ledger_dir = None
+    out_dir = None
     standalone_only = False
     strict = True
     i = 0
@@ -923,6 +962,8 @@ if __name__ == '__main__':
             slug = args[i + 1]; i += 2
         elif a == '--ledger' and i + 1 < len(args):
             ledger_dir = args[i + 1]; i += 2
+        elif a == '--out-dir' and i + 1 < len(args):
+            out_dir = args[i + 1]; i += 2
         elif a == '--standalone-only':
             standalone_only = True; i += 1
         elif a == '--no-strict':
@@ -934,9 +975,12 @@ if __name__ == '__main__':
 
     if not issues_path:
         print('Usage: python3 scripts/report_builder.py <issues_json_path> '
-              '[--slug NAME] [--ledger <任务目录>] [--standalone-only] [--no-strict]')
-        print('Example: python3 scripts/report_builder.py scripts/configs/ga_issues.json '
-              '--ledger Reports/dem_20261030')
+              '[--ledger <任务目录>] [--out-dir <任务目录>] [--slug NAME] '
+              '[--standalone-only] [--no-strict]')
+        print('Example: python3 scripts/report_builder.py '
+              'Reports/dem_20261030/issues.json --ledger Reports/dem_20261030')
+        print('说明：报告、截图、过程记录统一放在任务目录内；'
+              '不传 --ledger / --out-dir 时自动建 Reports/<项目>_<日期>/')
         print('Exit codes: 0 通过 / 1 参数或文件错误 / 2 数据校验失败 / '
               '3 准出自检失败 / 4 账本仍有未完成项')
         sys.exit(1)
@@ -949,8 +993,19 @@ if __name__ == '__main__':
     with open(issues_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
+    # 任务目录：报告 / 截图 / 过程记录统一放一起（先算出来，校验截图路径要用）
+    project_slug = slug or str(data.get('project') or 'Review').replace(' ', '_').replace('/', '_')
+    date_tag = str(data.get('date') or datetime.now().strftime('%Y%m%d')).replace('-', '')
+    task_dir = out_dir or ledger_dir or os.path.join(REPORTS_DIR, f'{project_slug}_{date_tag}')
+    assets_dir = os.path.join(task_dir, 'assets')
+
+    # 先把历史全局 assets 里的图收拢进任务目录，保证报告自包含（新数据本来就在任务目录内，无操作）
+    collected = collect_assets(data.get('issues'), assets_dir)
+    if collected:
+        print(f'\n📦 已从历史 assets 收拢 {len(collected)} 张截图到任务目录：{task_dir}/assets/')
+
     # 出报告前先过 schema 校验：带假分数/断链证据/矛盾结论的报告比不出报告更危险
-    errors, warnings = validate_dataset(data)
+    errors, warnings = validate_dataset(data, assets_dir=assets_dir)
     if warnings:
         print('\n⚠️  数据校验告警（不阻断）：')
         for w in warnings:
@@ -963,9 +1018,6 @@ if __name__ == '__main__':
             print('\n（如确认要在不合规数据上出报告，可追加 --no-strict；此时报告会带明显缺陷）')
             sys.exit(2)
         print('\n   --no-strict 已生效：继续生成（报告存在上述缺陷）。')
-
-    project_slug = slug or str(data.get('project') or 'Review').replace(' ', '_').replace('/', '_')
-    date_tag = str(data.get('date') or datetime.now().strftime('%Y%m%d')).replace('-', '')
 
     # 过程账本门禁：还有 pending 项就不许出报告（防止「看起来完整、其实没查完」）
     coverage_html = ''
@@ -980,19 +1032,19 @@ if __name__ == '__main__':
             if strict:
                 sys.exit(4)
 
-    # 1. 生成普通版本（引用外部资产图片）
+    # 1. 生成普通版本（引用任务目录内的 assets 图片）
     if not standalone_only:
         html_content, score, total, p2, p3, p4 = build_report(
-            data, standalone=False, coverage_html=coverage_html)
+            data, standalone=False, coverage_html=coverage_html, assets_dir=assets_dir)
         output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
-        output_path = os.path.join(REPORTS_DIR, output_filename)
-        os.makedirs(REPORTS_DIR, exist_ok=True)
+        output_path = os.path.join(task_dir, output_filename)
+        os.makedirs(task_dir, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         print(f'\n✅ Standard Report generated: {output_path}')
 
         print('   准出自检：')
-        checks = self_check(html_content, data.get('issues', []))
+        checks = self_check(html_content, data.get('issues', []), assets_dir=assets_dir)
         for name, ok, note in checks:
             mark = '✅' if ok else '❌'
             print(f'     {mark} {name}: {note}')
@@ -1005,10 +1057,10 @@ if __name__ == '__main__':
 
     # 2. 生成 Standalone 版本（图片 Base64 内联）
     html_content_standalone, score, total, p2, p3, p4 = build_report(
-        data, standalone=True, coverage_html=coverage_html)
+        data, standalone=True, coverage_html=coverage_html, assets_dir=assets_dir)
     output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'
-    output_path_standalone = os.path.join(REPORTS_DIR, output_filename_standalone)
-    os.makedirs(REPORTS_DIR, exist_ok=True)
+    output_path_standalone = os.path.join(task_dir, output_filename_standalone)
+    os.makedirs(task_dir, exist_ok=True)
     with open(output_path_standalone, 'w', encoding='utf-8') as f:
         f.write(html_content_standalone)
     print(f'✅ Standalone Report generated: {output_path_standalone}')

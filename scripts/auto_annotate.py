@@ -150,17 +150,28 @@ def resolve_output_path(image_path, out=None):
 if __name__ == "__main__":
     argv = sys.argv[1:]
     if len(argv) < 2:
-        print("Usage: python3 auto_annotate.py <image_path> '<json_annotations>' [--out <file_or_dir>]")
-        print("Example: python3 auto_annotate.py screen.png "
-              "'[{\"rect\": [10, 10, 100, 100], \"label\": \"P2-较重\", \"color\": \"orange\"}]'")
-        print("默认输出：Reports/assets/<原图名>_annotated.<ext>")
+        print("Usage: python3 auto_annotate.py <image_path> '<json_annotations>' "
+              "[--dir <任务目录>] [--out <file_or_dir>]")
+        print("Example: python3 auto_annotate.py shot.png "
+              "'[{\"rect\": [10, 10, 100, 100], \"label\": \"P2-较重\", \"color\": \"orange\"}]' "
+              "--dir Reports/dem_20261030")
+        print("默认输出：<任务目录>/assets/<原图名>_annotated.<ext>；"
+              "不传 --dir 时回退到 Reports/assets/")
         sys.exit(1)
 
     out = None
+    task_dir = None
+    if '--dir' in argv:
+        i = argv.index('--dir')
+        task_dir = argv[i + 1] if i + 1 < len(argv) else None
+        argv = argv[:i] + argv[i + 2:]
     if '--out' in argv:
         i = argv.index('--out')
         out = argv[i + 1] if i + 1 < len(argv) else None
         argv = argv[:i] + argv[i + 2:]
+
+    if task_dir and not out:
+        out = os.path.join(task_dir, 'assets')
 
     path = argv[0]
     data = json.loads(argv[1])
