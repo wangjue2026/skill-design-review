@@ -130,6 +130,117 @@ def calculate_score(issues):
     return _accumulate_score(issues, ignore_defense=False, prefer_original=False)
 
 # ──────────────────────────────────────────────────────────────
+#  过程账本（ledger.json）读取与覆盖声明
+# ──────────────────────────────────────────────────────────────
+
+# 与 scripts/ledger.py 的 STAGES 保持一致
+STAGE_NAMES = {
+    'p0': '建账与假设', 'p1': '静态扫描', 'p2': '全景快照', 'p3': '任务剧本走查',
+    'p4': '维度2初判', 'p5': '全状态取证', 'p6': '定向交互取证',
+    'p7': '维度2终判', 'p8': '收口对账', 'p9': '定级与报告',
+}
+
+
+def read_ledger(ledger_dir):
+    """读取过程账本，返回 (覆盖声明 HTML, 未完成条目 id 列表)。
+
+    账本损坏或缺失时不阻断（返回空声明），但会打印告警——
+    账本是"防丢档"的辅助设施，不该因为它的故障让报告生成不了。
+    """
+    path = os.path.join(ledger_dir, 'ledger.json')
+    if not os.path.exists(path):
+        print(f'[Warning] 账本不存在，跳过覆盖声明：{path}')
+        return '', []
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f'[Warning] 账本读取失败（{e}），跳过覆盖声明')
+        return '', []
+
+    items = data.get('items') or []
+    if not items:
+        # 空账本 = 没登记任何检视项，等同于未检视，按「未完成」处理
+        print('[Warning] 账本为空（未登记任何检视项），视为未完成')
+        return '', ['(账本为空)']
+
+    def count(stage, status):
+        return sum(1 for i in items
+                   if i.get('stage') == stage and i.get('status') == status)
+
+    total = len(items)
+    done = sum(1 for i in items if i.get('status') == 'done')
+    nr = sum(1 for i in items if i.get('status') == 'not_reachable')
+    skipped = sum(1 for i in items if i.get('status') == 'skipped')
+    pending = [i for i in items if i.get('status') == 'pending']
+
+    reasons = {}
+    for i in items:
+        if i.get('status') == 'not_reachable':
+            r = i.get('reason') or 'UNSPECIFIED'
+            reasons[r] = reasons.get(r, 0) + 1
+
+    rows = []
+    for key in ('p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'):
+        n = sum(1 for i in items if i.get('stage') == key)
+        if not n:
+            continue
+        rows.append(
+            '<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%d</td></tr>'
+            % (key.upper(), _esc(STAGE_NAMES.get(key, key)), n,
+               count(key, 'done'), count(key, 'not_reachable'))
+        )
+
+    reason_html = ''
+    if reasons:
+        reason_html = ('<p style="margin-top:12px;"><strong>未覆盖原因分布</strong>：'
+                       + _esc('、'.join('%s × %d' % (k, v) for k, v in sorted(reasons.items())))
+                       + '</p>')
+
+    nr_list = ''
+    nr_items = [i for i in items if i.get('status') == 'not_reachable']
+    if nr_items:
+        lis = ''.join(
+            '<li><code>%s</code> %s（%s）</li>'
+            % (_esc(i.get('reason') or 'UNSPECIFIED'), _esc(i.get('name')),
+               _esc(i.get('page') or '—'))
+            for i in nr_items[:30]
+        )
+        nr_list = ('<p style="margin-top:10px;"><strong>未覆盖明细（最多展示 30 条）</strong></p>'
+                   '<ul style="margin:6px 0 0 18px; line-height:1.9;">%s</ul>' % lis)
+
+    pending_html = ''
+    if pending:
+        pending_html = (
+            '<p style="margin-top:12px; color:#d93026;"><strong>仍有 %d 项未完成</strong>：%s'
+            '（本报告按 --no-strict 生成，覆盖不完整）</p>'
+            % (len(pending), _esc('、'.join(i.get('id', '') for i in pending[:20])))
+        )
+
+    html = f"""
+        <section class="scoring-rules">
+            <h2>📊 本次检视覆盖情况声明</h2>
+            <p>本次共登记检视项 <strong>{total}</strong> 条，已完成 <strong>{done}</strong> 条，
+               未覆盖 <strong>{nr}</strong> 条，不适用 <strong>{skipped}</strong> 条，
+               未完成 <strong>{len(pending)}</strong> 条。</p>
+            <table class="rules-table">
+                <thead>
+                    <tr><th>趟次</th><th>名称</th><th>条目</th><th>完成</th><th>未覆盖</th></tr>
+                </thead>
+                <tbody>
+                    {''.join(rows)}
+                </tbody>
+            </table>
+            {reason_html}
+            {nr_list}
+            {pending_html}
+        </section>
+"""
+
+    return html, [i.get('id', '') for i in pending]
+
+
+# ──────────────────────────────────────────────────────────────
 #  证据与维度归属解析
 # ──────────────────────────────────────────────────────────────
 
@@ -575,7 +686,7 @@ def build_dim4_table(issues):
         </section>
 """
 
-def build_report(data, standalone=False):
+def build_report(data, standalone=False, coverage_html=''):
     issues = data.get('issues', [])
     project = data.get('project', '未命名项目')
     scenario = data.get('scenario', '—')
@@ -706,6 +817,13 @@ def build_report(data, standalone=False):
     else:
         content = content.replace('{{ISSUE_LIST}}', issue_list_html)
 
+    # 注入覆盖情况声明（来自 ledger.json），紧跟问题列表之后
+    if coverage_html:
+        if end_ph in content:
+            content = content.replace(end_ph, end_ph + '\n' + coverage_html, 1)
+        else:
+            content = content.replace('</body>', coverage_html + '\n</body>', 1)
+
     # 处理待验证假设区域：无假设时移除整个 section，避免 {{HYPOTHESIS_*}} 占位符与默认截图容器残留
     if not data.get('hypotheses'):
         sec_start = content.find('<section class="hypothesis-section">')
@@ -795,6 +913,7 @@ if __name__ == '__main__':
     args = [a for a in sys.argv[1:]]
     issues_path = None
     slug = None
+    ledger_dir = None
     standalone_only = False
     strict = True
     i = 0
@@ -802,6 +921,8 @@ if __name__ == '__main__':
         a = args[i]
         if a == '--slug' and i + 1 < len(args):
             slug = args[i + 1]; i += 2
+        elif a == '--ledger' and i + 1 < len(args):
+            ledger_dir = args[i + 1]; i += 2
         elif a == '--standalone-only':
             standalone_only = True; i += 1
         elif a == '--no-strict':
@@ -813,9 +934,11 @@ if __name__ == '__main__':
 
     if not issues_path:
         print('Usage: python3 scripts/report_builder.py <issues_json_path> '
-              '[--slug NAME] [--standalone-only] [--no-strict]')
-        print('Example: python3 scripts/report_builder.py scripts/configs/ga_issues.json')
-        print('Exit codes: 0 通过 / 1 参数或文件错误 / 2 数据校验失败 / 3 准出自检失败')
+              '[--slug NAME] [--ledger <任务目录>] [--standalone-only] [--no-strict]')
+        print('Example: python3 scripts/report_builder.py scripts/configs/ga_issues.json '
+              '--ledger Reports/dem_20261030')
+        print('Exit codes: 0 通过 / 1 参数或文件错误 / 2 数据校验失败 / '
+              '3 准出自检失败 / 4 账本仍有未完成项')
         sys.exit(1)
 
     issues_path = os.path.abspath(issues_path)
@@ -844,9 +967,23 @@ if __name__ == '__main__':
     project_slug = slug or str(data.get('project') or 'Review').replace(' ', '_').replace('/', '_')
     date_tag = str(data.get('date') or datetime.now().strftime('%Y%m%d')).replace('-', '')
 
+    # 过程账本门禁：还有 pending 项就不许出报告（防止「看起来完整、其实没查完」）
+    coverage_html = ''
+    if ledger_dir:
+        coverage_html, pending_ids = read_ledger(ledger_dir)
+        if pending_ids:
+            print(f'\n❌ 账本仍有 {len(pending_ids)} 项未完成，已拒绝出报告：')
+            for pid in pending_ids[:20]:
+                print(f'   - {pid}')
+            print('\n请把每项改为 done（附证据）或 not_reachable（附原因码），'
+                  '或确认后在 --no-strict 下生成「覆盖不完整」的报告。')
+            if strict:
+                sys.exit(4)
+
     # 1. 生成普通版本（引用外部资产图片）
     if not standalone_only:
-        html_content, score, total, p2, p3, p4 = build_report(data, standalone=False)
+        html_content, score, total, p2, p3, p4 = build_report(
+            data, standalone=False, coverage_html=coverage_html)
         output_filename = f'{project_slug}_设计检视报告_{date_tag}.html'
         output_path = os.path.join(REPORTS_DIR, output_filename)
         os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -867,7 +1004,8 @@ if __name__ == '__main__':
             sys.exit(3)
 
     # 2. 生成 Standalone 版本（图片 Base64 内联）
-    html_content_standalone, score, total, p2, p3, p4 = build_report(data, standalone=True)
+    html_content_standalone, score, total, p2, p3, p4 = build_report(
+        data, standalone=True, coverage_html=coverage_html)
     output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'
     output_path_standalone = os.path.join(REPORTS_DIR, output_filename_standalone)
     os.makedirs(REPORTS_DIR, exist_ok=True)
