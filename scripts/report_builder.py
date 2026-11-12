@@ -720,6 +720,48 @@ def build_dim4_table(issues):
         </section>
 """
 
+def build_hypothesis_card(hyp, standalone=False, assets_dir=None, card_tpl=''):
+    """渲染单条「待验证假设」卡片（不参与评分，单独成区）。"""
+    img_file = str(hyp.get('img_file') or '').strip()
+    img_path = asset_path(img_file, assets_dir) if img_file else ''
+    img_url = ''
+    if img_path and os.path.exists(img_path):
+        if standalone:
+            try:
+                with open(img_path, 'rb') as f:
+                    raw = f.read()
+                ext = os.path.splitext(img_file)[1].lower()
+                mime = 'image/png' if ext == '.png' else (
+                    'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/gif')
+                img_url = f"data:{mime};base64,{base64.b64encode(raw).decode('utf-8')}"
+            except OSError:
+                img_url = f"assets/{img_file}"
+        else:
+            img_url = f"assets/{img_file}"
+
+    dims = hyp.get('dimensions') or []
+    dim_tag = ('维度 ' + '、'.join(str(d) for d in dims)) if dims else ''
+
+    html = card_tpl
+    html = html.replace('{{HYPOTHESIS_IMG_URL}}', _esc(img_url) if img_url else '')
+    html = html.replace('{{HYPOTHESIS_TITLE}}', _esc(hyp.get('title') or '待验证假设'))
+    html = html.replace('{{HYPOTHESIS_DESCRIPTION}}', _esc(hyp.get('description') or ''))
+    html = html.replace('{{HYPOTHESIS_TO_VERIFY}}',
+                        _esc(hyp.get('to_verify') or hyp.get('alternative_path_check') or ''))
+    html = html.replace('{{HYPOTHESIS_BASIS}}',
+                        _esc(hyp.get('basis') or hyp.get('business_impact') or ''))
+    html = html.replace('{{HYPOTHESIS_IMAGE_CAPTION}}', _esc(hyp.get('image_caption') or ''))
+    html = html.replace('{{HYPOTHESIS_DIMENSION_TAG}}', _esc(dim_tag))
+
+    if not img_url:
+        start = html.find('<div class="issue-evidence-media">')
+        cap = html.find('<p class="image-caption">', start) if start != -1 else -1
+        end = html.find('</p>', cap) if cap != -1 else -1
+        if start != -1 and end != -1:
+            html = html[:start] + html[end + len('</p>'):]
+    return html
+
+
 def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     issues = data.get('issues', [])
     project = data.get('project', '未命名项目')
@@ -862,13 +904,26 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
         else:
             content = content.replace('</body>', coverage_html + '\n</body>', 1)
 
-    # 处理待验证假设区域：无假设时移除整个 section，避免 {{HYPOTHESIS_*}} 占位符与默认截图容器残留
-    if not data.get('hypotheses'):
+    # 处理待验证假设区域：有假设则逐条渲染卡片，无假设则整体移除 section（避免占位符残留）
+    hyps = data.get('hypotheses') or []
+    if not hyps:
         sec_start = content.find('<section class="hypothesis-section">')
         if sec_start != -1:
             sec_end = content.find('</section>', sec_start)
             if sec_end != -1:
                 content = content[:sec_start] + content[sec_end + len('</section>'):]
+    else:
+        hs_ph = '<!-- HYPOTHESIS_LIST_START -->'
+        he_ph = '<!-- HYPOTHESIS_LIST_END -->'
+        hs = content.find(hs_ph)
+        he = content.find(he_ph)
+        if hs != -1 and he != -1:
+            card_tpl = content[hs + len(hs_ph):he]
+            cards = '\n'.join(
+                build_hypothesis_card(h, standalone=standalone, assets_dir=assets_dir,
+                                      card_tpl=card_tpl)
+                for h in hyps if isinstance(h, dict))
+            content = content[:hs + len(hs_ph)] + '\n' + cards + '\n' + content[he:]
 
     return content, score, total, p2, p3, p4
 
@@ -876,7 +931,7 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
 #  准出自检（报告生成后强制校验）
 # ──────────────────────────────────────────────────────────────
 
-def self_check(html_content, issues, assets_dir=None):
+def self_check(html_content, issues, assets_dir=None, hypotheses=None):
     """准出自检。返回 (检查项名, 是否通过, 说明) 列表；任一项 False 即阻止交付。
 
     与旧实现的区别：截图不再只数 DOM 里的字符串出现次数（那样断链图也会通过），
@@ -892,6 +947,8 @@ def self_check(html_content, issues, assets_dir=None):
 
     dim4_batch, card_issues = split_dim4_batch(issues)
     rendered = card_issues if dim4_batch else list(issues)
+    # 待验证假设同样渲染截图（共用 issue-img-wrapper 样式），必须计入对齐校验
+    rendered += [h for h in (hypotheses or []) if isinstance(h, dict)]
 
     # ① 证据文件存在性（断链即失败）
     missing = [str(i.get('img_file')) for i in rendered if declared(i) and not usable(i)]
@@ -954,6 +1011,7 @@ if __name__ == '__main__':
     ledger_dir = None
     out_dir = None
     standalone_only = False
+    make_standalone = False   # 默认不生成单文件版：仅在需要对外分发时用 --standalone 显式开启
     strict = True
     i = 0
     while i < len(args):
@@ -965,7 +1023,9 @@ if __name__ == '__main__':
         elif a == '--out-dir' and i + 1 < len(args):
             out_dir = args[i + 1]; i += 2
         elif a == '--standalone-only':
-            standalone_only = True; i += 1
+            standalone_only = True; make_standalone = True; i += 1
+        elif a == '--standalone':
+            make_standalone = True; i += 1
         elif a == '--no-strict':
             strict = False; i += 1
         elif not a.startswith('--') and issues_path is None:
@@ -976,11 +1036,12 @@ if __name__ == '__main__':
     if not issues_path:
         print('Usage: python3 scripts/report_builder.py <issues_json_path> '
               '[--ledger <任务目录>] [--out-dir <任务目录>] [--slug NAME] '
-              '[--standalone-only] [--no-strict]')
+              '[--standalone] [--standalone-only] [--no-strict]')
         print('Example: python3 scripts/report_builder.py '
               'Reports/dem_20261030/issues.json --ledger Reports/dem_20261030')
         print('说明：报告、截图、过程记录统一放在任务目录内；'
-              '不传 --ledger / --out-dir 时自动建 Reports/<项目>_<日期>/')
+              '不传 --ledger / --out-dir 时自动建 Reports/<项目>_<日期>/；'
+              '默认只出标准版，需单文件分发时加 --standalone')
         print('Exit codes: 0 通过 / 1 参数或文件错误 / 2 数据校验失败 / '
               '3 准出自检失败 / 4 账本仍有未完成项')
         sys.exit(1)
@@ -1044,7 +1105,8 @@ if __name__ == '__main__':
         print(f'\n✅ Standard Report generated: {output_path}')
 
         print('   准出自检：')
-        checks = self_check(html_content, data.get('issues', []), assets_dir=assets_dir)
+        checks = self_check(html_content, data.get('issues', []), assets_dir=assets_dir,
+                            hypotheses=data.get('hypotheses', []))
         for name, ok, note in checks:
             mark = '✅' if ok else '❌'
             print(f'     {mark} {name}: {note}')
@@ -1055,7 +1117,12 @@ if __name__ == '__main__':
                   f'{[c[0] for c in failed]}')
             sys.exit(3)
 
-    # 2. 生成 Standalone 版本（图片 Base64 内联）
+    # 2. 生成 Standalone 版本（图片 Base64 内联）——仅在 --standalone / --standalone-only 时生成
+    if not make_standalone:
+        print('\n   （未生成单文件版；需要对外分发时加 --standalone）')
+        print(f'   Total issues : {total} (P2:{p2} P3:{p3} P4:{p4})')
+        print(f'   Score        : {score:.1f} / 100')
+        sys.exit(0)
     html_content_standalone, score, total, p2, p3, p4 = build_report(
         data, standalone=True, coverage_html=coverage_html, assets_dir=assets_dir)
     output_filename_standalone = f'{project_slug}_设计检视报告_{date_tag}_standalone.html'

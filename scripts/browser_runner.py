@@ -863,6 +863,50 @@ def cmd_status(args):
     return 0 if alive else 1
 
 
+_JS_TOOLTIP = """
+const vis = e => { const r = e.getBoundingClientRect();
+  const cs = getComputedStyle(e);
+  return r.width > 0 && r.height > 0 && parseFloat(cs.opacity || '1') > 0.1
+         && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+const cands = Array.from(document.querySelectorAll(
+  '[role=tooltip],[class*=tooltip],[class*=popover],[class*=popper],[class*=tip]'));
+return JSON.stringify(Array.from(new Set(cands.filter(vis)
+  .map(e => (e.innerText || '').trim()).filter(t => t))).slice(0, 3));
+"""
+
+_JS_FIND = """
+function __path(el){const q=[];while(el&&el.nodeType===1&&q.length<10){let s=el.tagName.toLowerCase();
+  const p=el.parentElement;if(p){const sibs=Array.from(p.children).filter(c=>c.tagName===el.tagName);
+  if(sibs.length>1)s+=':nth-of-type('+(sibs.indexOf(el)+1)+')';}q.unshift(s);el=p;}return q.join(' > ');}
+const txt = %s, exact = %s, limit = %d, out = [];
+if (txt) {
+  document.querySelectorAll('body *').forEach(e => {
+    const t = (e.innerText || '').trim();
+    if (!(exact ? t === txt : t.includes(txt))) return;
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    if (out.length >= limit) return;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const hit = document.elementFromPoint(cx, cy);
+    out.push({ text: t.slice(0, 40), tag: e.tagName, cls: String(e.className).slice(0, 50),
+               rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+               disabled: /is-disabled|disabled/.test(String(e.className)) || e.getAttribute('aria-disabled') === 'true',
+               hit_self: !!hit && (hit === e || e.contains(hit)),
+               path: __path(e) });
+  });
+}
+return JSON.stringify(out);
+"""
+
+_JS_READY = """
+const e = document.querySelector(%s);
+if (!e) return false;
+const r = e.getBoundingClientRect();
+const cs = getComputedStyle(e);
+return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+"""
+
+
 def _run_ops(page, ops):
     """在单个会话内顺序执行操作序列，返回结果字典。
 
@@ -875,6 +919,8 @@ def _run_ops(page, ops):
       {"op":"scroll","selector":"css:.table-body","dy":600}   # 真实滚轮
       {"op":"key","key":"Enter"}                              # 真实按键
       {"op":"eval","script":"return ...","name":"结果键名"}    # 兜底：仅用于取值/构造特殊态
+      {"op":"find","text":"加速配置","exact":true}          # 按文本定位可见元素，回传唯一路径/矩形/命中
+      {"op":"waitfor","selector":"css:.x","text":"就绪文案","timeout":30}  # 轮询到可见再继续，替代盲等
       {"op":"shot","out":"Reports/assets/x.png","full_page":false}
       {"op":"wait","seconds":1.0}
 
@@ -909,9 +955,14 @@ def _run_ops(page, ops):
                                scroll=item.get('scroll', True))
                 )
             elif op == 'hover':
-                results.setdefault('actions', []).append(
-                    page.hover(item['selector'], scroll=item.get('scroll', True))
-                )
+                res = page.hover(item['selector'], scroll=item.get('scroll', True))
+                # 悬停即取解释浮层：置灰/禁用/不可用的原因往往只存在于 tooltip 中，
+                # 用 DOM 属性（title/aria-disabled）代替真实悬停会漏判
+                try:
+                    res['tooltip_text'] = json.loads(page.evaluate(_JS_TOOLTIP))
+                except Exception:
+                    res['tooltip_text'] = []
+                results.setdefault('actions', []).append(res)
             elif op == 'type':
                 results.setdefault('actions', []).append(
                     page.type_text(item['selector'], item.get('text', ''),
@@ -923,6 +974,31 @@ def _run_ops(page, ops):
                     page.scroll(selector=item.get('selector'),
                                 dy=item.get('dy', 0), dx=item.get('dx', 0))
                 )
+            elif op == 'find':
+                results[item.get('name') or 'find_%d' % idx] = json.loads(
+                    page.evaluate(_JS_FIND % (_js_str(item.get('text', '')),
+                                             'true' if item.get('exact', True) else 'false',
+                                             int(item.get('limit', 8)))))
+            elif op == 'waitfor':
+                sel = item.get('selector')
+                txt = item.get('text')
+                deadline = time.time() + float(item.get('timeout', 30))
+                ok, elapsed = False, 0.0
+                started = time.time()
+                while time.time() < deadline:
+                    if sel:
+                        ok = bool(page.evaluate(_JS_READY % _js_str(_normalize_selector(sel))))
+                    else:
+                        ok = bool(page.evaluate(
+                            "const t=%s;return Array.from(document.querySelectorAll('body *'))"
+                            ".some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0"
+                            "&&(e.innerText||'').trim()===t;});" % _js_str(txt or '')))
+                    if ok:
+                        break
+                    time.sleep(0.4)
+                elapsed = round(time.time() - started, 1)
+                results.setdefault('waits', []).append(
+                    {'op': 'waitfor', 'selector': sel, 'text': txt, 'ok': ok, 'elapsed': elapsed})
             elif op == 'key':
                 results.setdefault('actions', []).append(page.press_key(item.get('key', 'Enter')))
             elif op == 'eval':
@@ -964,16 +1040,24 @@ def cmd_run(args):
     page = connect(state)
     results = _run_ops(page, ops)
 
-    if args.keep_open is False:
+    # 默认保活：整段走查共用同一个浏览器会话。频繁拉起/关闭会重复下载大体积 mock 数据，
+    # 也违反「一次任务只开一次浏览器」的执行铁律；确需关闭时显式加 --close。
+    if args.close:
         _stop_session()
+        print(json.dumps({'hint': '已按 --close 关闭会话；如需继续走查需重新拉起'},
+                         ensure_ascii=False))
 
-    _emit({
+    payload = {
         'status': 'ok',
         'reused_existing': not started,
         'binary': state['binary'],
         'cdp_port': state['port'],
         'results': results,
-    })
+    }
+    if not args.close:
+        payload['session'] = ('reused' if not started
+                              else 'NEW_SESSION_LAUNCHED（后续请复用，勿重复拉起）')
+    _emit(payload)
     return 0
 
 
@@ -1020,7 +1104,9 @@ def main():
     p = sub.add_parser('run', help='一次性拉起浏览器并执行整段操作序列（推荐）')
     p.add_argument('--ops', required=True, help='操作序列 JSON 文件路径')
     p.add_argument('--keep-open', action='store_true',
-                   help='执行完保留浏览器窗口（默认执行完关闭）')
+                   help='（已废弃，默认即保活）历史参数，仅为兼容旧脚本保留')
+    p.add_argument('--close', action='store_true',
+                   help='执行完关闭浏览器会话（默认保活，供后续命令复用同一会话）')
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser('stop', help='关闭会话')
