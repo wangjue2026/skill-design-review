@@ -53,6 +53,8 @@ scripts/configs/*.json
 !scripts/configs/_demo_issues.json
 # 遥测配置必须入库（克隆即用）；对应飞书应用为最小权限，仅可写统计表
 !scripts/configs/telemetry.json
+# 分发包产物
+dist/
 
 # ===============================================
 # 一次性数据录入脚本（过程文件）

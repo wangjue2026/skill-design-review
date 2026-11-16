@@ -23,8 +23,20 @@
   - `report_builder.py`: 通用报告生成器，读取问题 JSON（按 `configs/_template_issues.json` 空壳模板填写）并结合模板生成结构化 HTML 检视报告，内置评分计算、schema 校验、枚举白名单校验、**截图存在性校验**与准出自检；校验不通过以非零退出码拒绝出报告（`2` = 数据校验失败，`3` = 准出自检失败，`4` = 过程账本仍有未完成项），`--no-strict` 可临时放宽。
   - `ledger.py`: **过程账本工具**（防丢档）。把「证据 ↔ 结论」的绑定关系落盘到 `Reports/<任务>_<日期>/ledger.json`，支持 `init / add / apply / status / check / summary`；原子写 + 自动 `.bak`，中断后可按 `pending` 条目断点续跑；`check` 是有 pending 即非零退出的门禁。
   - `migrate_reports.py`: 一次性迁移脚本，把早期平铺在 `Reports/` 根下的报告（含 `_standalone` 版本）收进 `Reports/<报告名>/` 并把其引用的截图复制到同目录 `assets/`；支持 `--dry-run` 先看计划。
-  - `telemetry.py`: **使用遥测**（静默、可关闭）。`report_builder.py` 出报告后自动登记一行（任务名称、时间、维度、得分、问题数、报告文件、Agent、模型、耗时、Skill 版本），事件先落本地 `~/.design-review/telemetry/outbox/` 再由后台进程批量补报到飞书多维表格；网络失败不丢数据、不阻断报告。配置在 `scripts/configs/telemetry.json`（对应飞书应用为最小权限，仅可写统计表），维护者运行一次 `python3 scripts/telemetry.py setup` 即可自动建齐表字段（加 `--prune` 顺带清掉多余列）。`app_secret` 属密钥、不入库：写在 `~/.design-review/telemetry/config.json`（`{"feishu":{"app_secret":"..."}}`）或设环境变量 `DR_FEISHU_APP_SECRET`。
+  - `telemetry.py`: **使用遥测**（静默、可关闭）。`report_builder.py` 出报告后自动登记一行（任务名称、时间、维度、得分、问题数、报告文件、Agent、模型、耗时、Skill 版本），事件先落本地 `~/.design-review/telemetry/outbox/` 再由后台进程批量补报到飞书多维表格；网络失败不丢数据、不阻断报告。配置在 `scripts/configs/telemetry.json`（对应飞书应用为最小权限，仅可写统计表），维护者运行一次 `python3 scripts/telemetry.py setup` 即可自动建齐表字段（加 `--prune` 顺带清掉多余列）。`app_secret` 属密钥、不入库。本机开发时写在 `~/.design-review/telemetry/config.json`（`{"feishu":{"app_secret":"..."}}`）或设环境变量 `DR_FEISHU_APP_SECRET`；对外分发时按下一节填入分发包。
   - `configs/`: issues JSON 模板与历史样例（`_template_issues.json` 为纯空壳，不含任何示例数值）。
+
+## 📦 分发（三步出包）
+
+仓库保持公开、且**永不含密钥**；密钥只出现在你手工补齐的那一版分发包里。
+
+1. GitHub → Code → **Download ZIP**，解压得到 `design-review-skill-main/`；
+2. 编辑 `scripts/configs/telemetry.json`，把 `"app_secret": ""` 填成真实密钥（其余 `app_id` / `app_token` / `table_id` 已在文件中，无需改动）；
+3. 在该目录执行 `python3 scripts/repack_zip.py`，产出 `dist/design-review-skill-<日期>.zip`，直接发给同事。
+
+收包人解压后**零配置即可用**（检视、报告、遥测上报全部生效）。
+
+为什么第 3 步不直接用系统自带压缩：Finder「压缩」会掺入 `__MACOSX/`、`.DS_Store`，且中文文件名不带 UTF-8 标记，Windows 解压后 `references/01_体验目标制定.md` 会变乱码。`repack_zip.py` 会排除这些垃圾并按 UTF-8 标记写条目名，同时校验密钥是否已填（没填会中止）。
 
 ## 🎯 四大检视维度与执行顺序规程
 - **维度选择式执行（默认分开）**：默认不自动全量检视，启动时输出维度选择卡片（说明各维度范围与意图）并给出初步判断，由用户确认要检视的维度；只有用户明确「全量」才同时执行全部 4 个维度。
