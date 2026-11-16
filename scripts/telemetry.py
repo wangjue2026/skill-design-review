@@ -13,10 +13,11 @@
      会上传 HTML 报告单文件版（standalone），供表格里直接点开查看。
 
 凭证分发：
-  配置在 scripts/configs/telemetry.json（随仓库分发，克隆即用）。
+  非密钥字段配置在 scripts/configs/telemetry.json（随仓库分发）。
   对应飞书应用应为"最小权限"（仅授权这一张多维表格的读写），
   即使凭证泄露也只能向统计表写入垃圾记录，无任何业务数据风险。
-  本地覆盖（不入库）：~/.design-review/telemetry/config.json 优先于仓库配置。
+  app_secret 属密钥，禁止入库：放在 ~/.design-review/telemetry/config.json
+  （不入库，按字段覆盖仓库配置），或设环境变量 DR_FEISHU_APP_SECRET。
 
 关闭方式（opt-out，立即生效且不再落任何盘）：
   环境变量 DR_TELEMETRY=off，或创建文件 ~/.design-review/telemetry/disabled
@@ -101,19 +102,46 @@ def is_disabled():
     return os.path.exists(DISABLED_FLAG)
 
 
+ENV_OVERRIDES = {
+    'DR_FEISHU_APP_ID': 'app_id',
+    'DR_FEISHU_APP_SECRET': 'app_secret',
+    'DR_FEISHU_APP_TOKEN': 'app_token',
+    'DR_FEISHU_TABLE_ID': 'table_id',
+}
+
+
+def _read_json(path, verbose=False):
+    try:
+        if os.path.exists(path):
+            with open(path, encoding='utf-8') as f:
+                return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        _v('配置读取失败（忽略）：%s — %s' % (path, e), verbose)
+    return None
+
+
 def load_config(verbose=False):
-    """本地用户配置优先于仓库配置；都没有则视为"未配置"（只落盘不上报）。"""
-    for path in (USER_CONFIG, REPO_CONFIG):
-        try:
-            if os.path.exists(path):
-                with open(path, encoding='utf-8') as f:
-                    cfg = json.load(f)
-                if cfg.get('enabled') and cfg.get('feishu', {}).get('app_id'):
-                    return cfg, path
-                _v('配置存在但未启用或缺 app_id：%s' % path, verbose)
-        except (OSError, json.JSONDecodeError) as e:
-            _v('配置读取失败（忽略）：%s — %s' % (path, e), verbose)
-    return None, None
+    """仓库配置为底 → 用户配置按字段覆盖 → 环境变量覆盖。
+    密钥（app_secret）不入库，只从用户配置或环境变量来；缺密钥视为"未配置"（只落盘不上报）。"""
+    cfg = _read_json(REPO_CONFIG, verbose) or {}
+    user = _read_json(USER_CONFIG, verbose) or {}
+    if user.get('enabled') is False:
+        cfg['enabled'] = False
+    if user.get('feishu'):
+        cfg.setdefault('feishu', {}).update(
+            {k: v for k, v in user['feishu'].items() if v})
+    feishu = cfg.setdefault('feishu', {})
+    for env, key in ENV_OVERRIDES.items():
+        val = os.environ.get(env, '').strip()
+        if val:
+            feishu[key] = val
+    if not feishu.get('app_secret'):
+        _v('未提供 app_secret（可用 ~/.design-review/telemetry/config.json '
+           '或环境变量 DR_FEISHU_APP_SECRET）：只落盘，不上报', verbose)
+    if not cfg.get('enabled') or not feishu.get('app_id') or not feishu.get('app_secret'):
+        _v('未找到有效配置：只落盘，不上报', verbose)
+        return None, None
+    return cfg, (USER_CONFIG if user.get('feishu') else REPO_CONFIG)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -502,17 +530,15 @@ def flush_events(verbose=False):
 def setup_fields(verbose=True, prune=False):
     cfg, cfg_path = load_config(verbose)
     if not cfg:
-        print('未找到有效配置。请先在 scripts/configs/telemetry.json 填入：')
+        print('未找到有效配置。app_secret 不入库，请写入 %s（或设 DR_FEISHU_APP_SECRET）：'
+              % USER_CONFIG)
         print(json.dumps({
-            'enabled': True,
             'feishu': {
-                'app_id': 'cli_xxxxxxxx',
                 'app_secret': '********',
-                'app_token': 'bascnXXXXXXXX',   # 多维表格 URL /base/ 后的一段
-                'table_id': 'tblXXXXXXXX',      # URL 中 table= 参数
-                'base_url': 'https://open.feishu.cn',
             },
         }, ensure_ascii=False, indent=2))
+        print('其余字段（app_id / app_token / table_id / base_url）沿用 '
+              'scripts/configs/telemetry.json。')
         return 1
     fs = cfg['feishu']
     base = fs.get('base_url', 'https://open.feishu.cn')
