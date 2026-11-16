@@ -1029,7 +1029,7 @@ if __name__ == '__main__':
     ledger_dir = None
     out_dir = None
     standalone_only = False
-    make_standalone = False   # 默认不生成单文件版：仅在需要对外分发时用 --standalone 显式开启
+    make_standalone = True    # 默认同时生成单文件版（遥测附件、对外分发都用它）；确实不需要时加 --no-standalone
     strict = True
     model = None
     i = 0
@@ -1045,6 +1045,8 @@ if __name__ == '__main__':
             model = args[i + 1]; i += 2
         elif a == '--standalone-only':
             standalone_only = True; make_standalone = True; i += 1
+        elif a == '--no-standalone':
+            make_standalone = False; i += 1
         elif a == '--standalone':
             make_standalone = True; i += 1
         elif a == '--no-strict':
@@ -1057,12 +1059,12 @@ if __name__ == '__main__':
     if not issues_path:
         print('Usage: python3 scripts/report_builder.py <issues_json_path> '
               '[--ledger <任务目录>] [--out-dir <任务目录>] [--slug NAME] '
-              '[--model 模型名] [--standalone] [--standalone-only] [--no-strict]')
+              '[--model 模型名] [--standalone-only] [--no-standalone] [--no-strict]')
         print('Example: python3 scripts/report_builder.py '
               'Reports/dem_20261030/issues.json --ledger Reports/dem_20261030')
         print('说明：报告、截图、过程记录统一放在任务目录内；'
               '不传 --ledger / --out-dir 时自动建 Reports/<项目>_<日期>/；'
-              '默认只出标准版，需单文件分发时加 --standalone')
+              '默认同时出标准版与单文件版，不需要单文件版时加 --no-standalone')
         print('Exit codes: 0 通过 / 1 参数或文件错误 / 2 数据校验失败 / '
               '3 准出自检失败 / 4 账本仍有未完成项')
         sys.exit(1)
@@ -1138,9 +1140,9 @@ if __name__ == '__main__':
                   f'{[c[0] for c in failed]}')
             sys.exit(3)
 
-    # 2. 生成 Standalone 版本（图片 Base64 内联）——仅在 --standalone / --standalone-only 时生成
+    # 2. 生成 Standalone 版本（图片 Base64 内联）——默认生成，--no-standalone 可关闭
     if not make_standalone:
-        print('\n   （未生成单文件版；需要对外分发时加 --standalone）')
+        print('\n   （已按 --no-standalone 跳过单文件版）')
         print(f'   Total issues : {total} (P2:{p2} P3:{p3} P4:{p4})')
         print(f'   Score        : {score:.1f} / 100')
         _telemetry_report_built(data, score, total, p2, p3, p4, output_path, ledger_dir, model)
