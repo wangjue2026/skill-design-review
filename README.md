@@ -23,6 +23,7 @@
   - `report_builder.py`: 通用报告生成器，读取问题 JSON（按 `configs/_template_issues.json` 空壳模板填写）并结合模板生成结构化 HTML 检视报告，内置评分计算、schema 校验、枚举白名单校验、**截图存在性校验**与准出自检；校验不通过以非零退出码拒绝出报告（`2` = 数据校验失败，`3` = 准出自检失败，`4` = 过程账本仍有未完成项），`--no-strict` 可临时放宽。
   - `ledger.py`: **过程账本工具**（防丢档）。把「证据 ↔ 结论」的绑定关系落盘到 `Reports/<任务>_<日期>/ledger.json`，支持 `init / add / apply / status / check / summary`；原子写 + 自动 `.bak`，中断后可按 `pending` 条目断点续跑；`check` 是有 pending 即非零退出的门禁。
   - `migrate_reports.py`: 一次性迁移脚本，把早期平铺在 `Reports/` 根下的报告（含 `_standalone` 版本）收进 `Reports/<报告名>/` 并把其引用的截图复制到同目录 `assets/`；支持 `--dry-run` 先看计划。
+  - `telemetry.py`: **使用遥测**（静默、可关闭）。`report_builder.py` 出报告后自动登记一行（任务名称、时间、维度、得分、问题数、报告文件、Agent、模型、耗时、Skill 版本），事件先落本地 `~/.design-review/telemetry/outbox/` 再由后台进程批量补报到飞书多维表格；网络失败不丢数据、不阻断报告。配置在 `scripts/configs/telemetry.json`（对应飞书应用为最小权限，仅可写统计表），维护者运行一次 `python3 scripts/telemetry.py setup` 即可自动建齐表字段（加 `--prune` 顺带清掉多余列）。
   - `configs/`: issues JSON 模板与历史样例（`_template_issues.json` 为纯空壳，不含任何示例数值）。
 
 ## 🎯 四大检视维度与执行顺序规程
@@ -51,6 +52,14 @@ Skill 在启动时依据 `SKILL.md §0.1` 的三级判定识别当前环境是�
    - 当判定具备浏览器能力（内置浏览器子进程 / 浏览器 MCP / 三原语探测通过）时，先按 `SKILL.md §0.2` 的**优先级**探测走查执行器：**能直接拉起独立浏览器窗口就直接用（视口可控、可置于后台），拉不起就用环境自带的浏览器工具兜底，全程不引导用户安装任何东西**；随后完成走查、截图、批注与录屏，生成 HTML 检视报告。
 2. **Tier 2 (降级模式 - 源码静态分析模式)**：
    - 当判定不具备浏览器能力时，平滑降级为静态代码分析，输出结构化 **Markdown** 报告，并在报告头部显式声明降级原因。
+
+## 📊 使用遥测声明（使用者须知）
+
+为持续改进本技能，每次检视会静默上报**一条元数据**到团队飞书多维表格：任务名称（报告名）、时间、所选维度、得分、问题数（`P2-3个、P3-4个、P4-0个`）、报告文件、Agent、模型、耗时、Skill 版本。其中「报告文件」会上传本次 HTML 报告的单文件版（standalone），方便直接在表格里打开。**不会**上报截图原图、问题全文或页面 URL。上报失败不影响任何功能。
+
+**彻底关闭**（立即生效，关闭后本地也不留痕）：
+- 环境变量：`export DR_TELEMETRY=off`
+- 或创建文件：`touch ~/.design-review/telemetry/disabled`
 
 ---
 **Maintainer**: 体验设计团队 (UX Design Team)

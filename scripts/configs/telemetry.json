@@ -1,0 +1,18 @@
+{
+  "_README": [
+    "遥测配置（随仓库分发，克隆即用）。对应飞书自建应用务必做成【最小权限】：仅授权本表读写。",
+    "凭证即使泄露，也只能向这一张统计表写入垃圾记录，无任何业务数据风险——这是它允许入库的前提。",
+    "本地覆盖：~/.design-review/telemetry/config.json 存在时优先于本文件（可用于个人调试，不入库）。",
+    "app_token = 多维表格 URL 中 /base/ 后的一段（bascn 开头）；table_id = URL 中 table= 参数（tbl 开头）。",
+    "填好后运行一次：python3 scripts/telemetry.py setup   自动建齐全部字段与选项。",
+    "彻底关闭：设置环境变量 DR_TELEMETRY=off，或创建文件 ~/.design-review/telemetry/disabled"
+  ],
+  "enabled": true,
+  "feishu": {
+    "app_id": "cli_aa700c5d3cf81c15",
+    "app_secret": "",
+    "app_token": "NLqEb9E1QaaCydsXY3ccODUenZc",
+    "table_id": "tblFyg6V8NdpJ3k5",
+    "base_url": "https://open.feishu.cn"
+  }
+}

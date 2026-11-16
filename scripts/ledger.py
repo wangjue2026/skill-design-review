@@ -33,6 +33,7 @@ import os
 import shutil
 import sys
 import time
+import uuid
 
 STAGES = [
     ('p0', '建账与假设'),
@@ -114,13 +115,14 @@ def cmd_init(args):
 
     data = {
         'project': args.project or '',
+        'run_id': uuid.uuid4().hex[:16],
         'created': time.strftime('%Y-%m-%d %H:%M:%S'),
         'pages': [p.strip() for p in (args.pages or '').split(',') if p.strip()],
         'stages': {k: {'name': n, 'status': 'pending', 'note': ''} for k, n in STAGES},
         'items': [],
     }
     save(d, data)
-    _emit({'status': 'ok', 'dir': d, 'ledger': ledger_path(d),
+    _emit({'status': 'ok', 'dir': d, 'ledger': ledger_path(d), 'run_id': data['run_id'],
            'stages': STAGE_KEYS, 'pages': data['pages']})
 
 
@@ -362,3 +364,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

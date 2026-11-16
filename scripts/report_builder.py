@@ -20,6 +20,24 @@ import base64
 import shutil
 from datetime import datetime
 
+# 遥测挂载（可选模块；任何失败都不影响报告生成，见 SKILL.md §1.5）
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import telemetry as _telemetry
+except Exception:
+    _telemetry = None
+
+
+def _telemetry_report_built(data, score, total, p2, p3, p4, report_file, ledger_dir, model=None):
+    """报告写盘成功后静默登记一条遥测事件；永不影响退出码。"""
+    try:
+        if _telemetry:
+            _telemetry.hook_report_built(data, score, p2, p3, p4,
+                                         report_file=report_file,
+                                         ledger_dir=ledger_dir, model=model)
+    except Exception:
+        pass
+
 # ──────────────────────────────────────────────────────────────
 #  配置
 # ──────────────────────────────────────────────────────────────
@@ -1013,6 +1031,7 @@ if __name__ == '__main__':
     standalone_only = False
     make_standalone = False   # 默认不生成单文件版：仅在需要对外分发时用 --standalone 显式开启
     strict = True
+    model = None
     i = 0
     while i < len(args):
         a = args[i]
@@ -1022,6 +1041,8 @@ if __name__ == '__main__':
             ledger_dir = args[i + 1]; i += 2
         elif a == '--out-dir' and i + 1 < len(args):
             out_dir = args[i + 1]; i += 2
+        elif a == '--model' and i + 1 < len(args):
+            model = args[i + 1]; i += 2
         elif a == '--standalone-only':
             standalone_only = True; make_standalone = True; i += 1
         elif a == '--standalone':
@@ -1036,7 +1057,7 @@ if __name__ == '__main__':
     if not issues_path:
         print('Usage: python3 scripts/report_builder.py <issues_json_path> '
               '[--ledger <任务目录>] [--out-dir <任务目录>] [--slug NAME] '
-              '[--standalone] [--standalone-only] [--no-strict]')
+              '[--model 模型名] [--standalone] [--standalone-only] [--no-strict]')
         print('Example: python3 scripts/report_builder.py '
               'Reports/dem_20261030/issues.json --ledger Reports/dem_20261030')
         print('说明：报告、截图、过程记录统一放在任务目录内；'
@@ -1122,6 +1143,7 @@ if __name__ == '__main__':
         print('\n   （未生成单文件版；需要对外分发时加 --standalone）')
         print(f'   Total issues : {total} (P2:{p2} P3:{p3} P4:{p4})')
         print(f'   Score        : {score:.1f} / 100')
+        _telemetry_report_built(data, score, total, p2, p3, p4, output_path, ledger_dir, model)
         sys.exit(0)
     html_content_standalone, score, total, p2, p3, p4 = build_report(
         data, standalone=True, coverage_html=coverage_html, assets_dir=assets_dir)
@@ -1134,3 +1156,5 @@ if __name__ == '__main__':
 
     print(f'   Total issues : {total} (P2:{p2} P3:{p3} P4:{p4})')
     print(f'   Score        : {score:.1f} / 100')
+    _telemetry_report_built(data, score, total, p2, p3, p4, output_path_standalone,
+                            ledger_dir, model)
