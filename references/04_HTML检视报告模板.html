@@ -294,6 +294,29 @@
         .tag-defense-downgraded { background: rgba(210, 153, 34, 0.15); color: var(--accent-warning); border: 1px solid var(--accent-warning); }
         .tag-defense-rejected { background: rgba(248, 81, 73, 0.15); color: var(--accent-error); border: 1px solid var(--accent-error); }
 
+        /* 归因标签：实现缺陷 / 样本数据（不计分）/ 视觉打磨 */
+        .tag-root-flow { background: rgba(58, 134, 255, 0.12); color: var(--accent-info); border: 1px solid var(--accent-info); }
+        .tag-root-sample { background: rgba(139, 148, 158, 0.12); color: var(--text-dim); border: 1px dashed var(--text-dim); }
+        .tag-root-polish { background: rgba(131, 56, 236, 0.1); color: var(--accent-dim); border: 1px solid var(--accent-dim); }
+
+        /* 样本数据待对齐清单：与计分问题分区展示 */
+        .sample-issue-section {
+            margin-top: 34px;
+            padding-top: 26px;
+            border-top: 1px dashed var(--border-color);
+        }
+        .sample-section-head h2 {
+            font-size: 18px;
+            margin: 0 0 8px;
+            color: var(--text-dim);
+        }
+        .sample-section-head p {
+            margin: 0 0 20px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-dim);
+        }
+
         /* 答辩复议面板样式 */
         .defense-panel {
             margin-top: 18px;

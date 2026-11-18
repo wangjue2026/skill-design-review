@@ -62,6 +62,35 @@ P4_CAP = 10.0
 VALID_SEVERITIES = ('p2', 'p3', 'p4')
 VALID_DIM_IDS = (1, 2, 3, 4)
 
+# 归因标签（root_cause）：
+#   flow   = 流程/交互实现缺陷，与数据无关 —— 计分
+#   sample = 样本数据不自洽（换真实数据即消失） —— **记录但不计分**
+#   polish = 视觉/文案打磨 —— 计分，且天然只到 P3/P4
+# 判定口诀：把这条问题里的对象名/数值换成一个真实的，问题还在吗？在 → flow；不在 → sample。
+VALID_ROOT_CAUSES = ('flow', 'sample', 'polish')
+ROOT_CAUSE_DISPLAY = {
+    'flow': '实现缺陷',
+    'sample': '样本数据 · 不计分',
+    'polish': '视觉/文案打磨',
+}
+ROOT_CAUSE_CLASS = {
+    'flow': 'tag-root-flow',
+    'sample': 'tag-root-sample',
+    'polish': 'tag-root-polish',
+}
+
+
+def root_cause_of(issue):
+    """读取归因标签；未填按 flow 处理（兼容历史 issues JSON）。"""
+    rc = str((issue or {}).get('root_cause') or 'flow').strip().lower()
+    return rc if rc in VALID_ROOT_CAUSES else 'flow'
+
+
+def is_sample_issue(issue):
+    """样本数据类问题：照常记录与展示，但不参与任何扣分。"""
+    return root_cause_of(issue) == 'sample'
+
+
 # 四维结论标准字典与样式映射（与 SKILL.md §4 严格一致，禁止同义词）
 VALID_DIM_ENUMS = {
     'dim1': {
@@ -115,6 +144,9 @@ def _accumulate_score(issues, ignore_defense=False, prefer_original=False):
 
     for issue in issues:
         if not isinstance(issue, dict):
+            continue
+        # 样本数据类：由数据真实性决定，天然不计分（初评/终评一致，不受答辩影响）
+        if is_sample_issue(issue):
             continue
         if not ignore_defense:
             defense = issue.get('defense') or {}
@@ -385,6 +417,17 @@ def validate_dataset(data, assets_dir=None):
         if sev not in VALID_SEVERITIES:
             errors.append(f'{prefix}.severity = {issue.get("severity")!r} 非法，只能是 p2 / p3 / p4')
 
+        rc_raw = str(issue.get('root_cause') or '').strip().lower()
+        if rc_raw and rc_raw not in VALID_ROOT_CAUSES:
+            errors.append(
+                f'{prefix}.root_cause = {issue.get("root_cause")!r} 非法，只能是 flow / sample / polish'
+            )
+        if rc_raw == 'sample' and sev == 'p2':
+            warnings.append(
+                f'{prefix} 为样本数据类（不计分）却定为 p2：建议按 p3/p4 呈现，'
+                f'避免与「主流程阻塞」混淆（p2 只留给与数据无关的实现/流程缺陷）'
+            )
+
         for field in ('title', 'related_task', 'tried_path', 'description',
                       'business_impact', 'solution'):
             if not str(issue.get(field, '')).strip():
@@ -617,6 +660,11 @@ def build_issue_card(issue, standalone=False, assets_dir=None):
 
     dimension_label = issue.get('dimension_tag') or _dimension_label(issue)
 
+    rc = root_cause_of(issue)
+    tag_root_html = (
+        f'<span class="issue-tag {ROOT_CAUSE_CLASS[rc]}">{_esc(ROOT_CAUSE_DISPLAY[rc])}</span>'
+    )
+
     return f"""
             <div class="issue-card">
                 <div class="tag-group">
@@ -624,6 +672,7 @@ def build_issue_card(issue, standalone=False, assets_dir=None):
                     <span class="issue-tag tag-dimension">{_esc(dimension_label)}</span>
                     <span class="issue-tag tag-{sev}">{_esc(SEVERITY_DISPLAY.get(sev, sev.upper()))}</span>
                     <span class="issue-tag tag-confidence">{_esc(issue.get('confidence_text') or '高置信')}</span>
+                    {tag_root_html}
                     {tag_defense_html}
                 </div>
                 <h3 class="issue-title">{_esc(issue.get('title'))}</h3>
@@ -791,9 +840,13 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     def is_waived(i):
         return i.get('defense', {}).get('status', '').lower() in ('waived', 'passed', 'accepted')
 
-    p2 = sum(1 for i in issues if i.get('severity', '').lower() == 'p2' and not is_waived(i))
-    p3 = sum(1 for i in issues if i.get('severity', '').lower() == 'p3' and not is_waived(i))
-    p4 = sum(1 for i in issues if i.get('severity', '').lower() == 'p4' and not is_waived(i))
+    def counts_for_score(i):
+        return not is_waived(i) and not is_sample_issue(i)
+
+    p2 = sum(1 for i in issues if i.get('severity', '').lower() == 'p2' and counts_for_score(i))
+    p3 = sum(1 for i in issues if i.get('severity', '').lower() == 'p3' and counts_for_score(i))
+    p4 = sum(1 for i in issues if i.get('severity', '').lower() == 'p4' and counts_for_score(i))
+    sample_count = sum(1 for i in issues if is_sample_issue(i))
     total = len(issues)
     score = calculate_score(issues)
 
@@ -823,16 +876,22 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     content = content.replace('{{P4_COUNT}}', str(p4))
 
     # 替换答辩评分相关占位符
+    score_subs = []
     if has_defense:
         content = content.replace('{{SCORE_BADGE_CLASS}}', ' has-defense')
         content = content.replace('{{SCORE_LABEL}}', '体验评分 · 复议终审')
-        content = content.replace('{{SCORE_SUB_HTML}}', f'<span class="initial-score-tag" title="答辩前初评得分">初评 {initial_score:.1f}</span>')
+        score_subs.append(f'<span class="initial-score-tag" title="答辩前初评得分">初评 {initial_score:.1f}</span>')
         content = content.replace('{{SCORE_DEFENSE_TAG}}', '<div class="defense-stamp-badge">已完成答辩复议</div>')
     else:
         content = content.replace('{{SCORE_BADGE_CLASS}}', '')
         content = content.replace('{{SCORE_LABEL}}', '体验评分')
-        content = content.replace('{{SCORE_SUB_HTML}}', '')
         content = content.replace('{{SCORE_DEFENSE_TAG}}', '')
+    if sample_count:
+        score_subs.append(
+            '<span class="initial-score-tag" title="样本数据类问题：照常记录，不计入体验评分">'
+            f'样本数据 {sample_count} 条 · 不计分</span>'
+        )
+    content = content.replace('{{SCORE_SUB_HTML}}', ''.join(score_subs))
     
     # 统计各维度的问题数（模块级 count_dim_issues：结构化解归属 + 排除答辩免责项）
     dim_issue_counts = count_dim_issues(issues)
@@ -890,7 +949,10 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     content = content.replace('{{QUALITATIVE_CONCLUSION}}', conclusion_html)
 
     # 生成问题列表 HTML：维度 4 批量 P3/P4 命中表格化（判定统一在 split_dim4_batch）
-    dim4_p3p4_issues, card_issues = split_dim4_batch(issues)
+    scored_issues = [i for i in issues if not is_sample_issue(i)]
+    sample_issues = [i for i in issues if is_sample_issue(i)]
+
+    dim4_p3p4_issues, card_issues = split_dim4_batch(scored_issues)
     if dim4_p3p4_issues:
         rendered_parts = []
         if card_issues:
@@ -902,7 +964,20 @@ def build_report(data, standalone=False, coverage_html='', assets_dir=None):
     else:
         issue_list_html = '\n'.join(
             build_issue_card(issue, standalone=standalone, assets_dir=assets_dir)
-            for issue in issues)
+            for issue in scored_issues)
+
+    if sample_issues:
+        sample_cards = '\n'.join(
+            build_issue_card(issue, standalone=standalone, assets_dir=assets_dir)
+            for issue in sample_issues)
+        issue_list_html += f"""
+        <section class="sample-issue-section">
+            <div class="sample-section-head">
+                <h2>样本数据待对齐清单（{len(sample_issues)} 条 · 不计分）</h2>
+                <p>以下问题由 mock / 示例数据本身造成：把对象名与数值换成真实数据后即不再成立，因此<b>照常记录、不参与体验评分</b>，供数据侧与实现侧对齐时核对。</p>
+            </div>
+            {sample_cards}
+        </section>"""
 
     # 注入问题列表
     start_ph = '<!-- ISSUE_LIST_START -->'
@@ -963,8 +1038,11 @@ def self_check(html_content, issues, assets_dir=None, hypotheses=None):
     def usable(i):
         return declared(i) and asset_exists(i.get('img_file'), assets_dir)
 
-    dim4_batch, card_issues = split_dim4_batch(issues)
-    rendered = card_issues if dim4_batch else list(issues)
+    # 样本数据类单独成区（必渲染为卡片，不参与维度 4 批量表格化）
+    scored_issues = [i for i in issues if not is_sample_issue(i)]
+    sample_issues = [i for i in issues if is_sample_issue(i)]
+    dim4_batch, card_issues = split_dim4_batch(scored_issues)
+    rendered = (card_issues if dim4_batch else list(scored_issues)) + sample_issues
     # 待验证假设同样渲染截图（共用 issue-img-wrapper 样式），必须计入对齐校验
     rendered += [h for h in (hypotheses or []) if isinstance(h, dict)]
 

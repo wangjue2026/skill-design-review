@@ -6,7 +6,6 @@
     "脚本会先做 schema 校验（字段缺失 / 级别非法 / 截图文件不存在 / 枚举越界 / 结论与问题数矛盾），校验不通过直接非零退出，不会生成报告。",
     "若本次确实零问题：删除下面 issues 里的骨架对象，把 issues 置为 []，并把四维结论改为白名单满分词（超预期达成 / 达成 / 符合 / 通过 / 完备）。"
   ],
-
   "_field_docs": {
     "issues[].dimensions": "【必填】整数数组，取值 1 / 2 / 3 / 4，一个问题只归属一个最贴切维度（互斥，禁止同一问题写多个维度）。维度 1 体验目标达成 / 2 产品理念契合度 / 3 常规交互 Checklist / 4 方案完备性。",
     "issues[].severity": "【必填】p2 | p3 | p4（小写）。",
@@ -16,14 +15,13 @@
     "dimensions.dimN_result": "【必填】白名单枚举，禁止同义词。维度 1：超预期达成 / 达成 / 基础达成 / 未达成 / 未显式走查；维度 2：符合 / 基本符合，有优化空间 / 部分符合 / 不符合 / 未显式走查；维度 3：通过 / 基本通过，有优化空间 / 基础达成 / 未达成 / 未显式走查；维度 4：完备 / 基本完备，存在边缘缺失 / 完备性不足 / 严重缺失 / 未显式走查。",
     "dimensions.dimN_explanation": "【必填】一句话说明该维度结论依据，不罗列具体问题。",
     "score_history.initial_score": "【仅答辩后填】必须等于脚本按 original_severity 重算的初评分，偏差会被告警。",
-    "hypotheses": "【可选】待验证假设数组，不参与评分扣分，单独渲染在附录区；结构同 issues，但不需要 severity。"
+    "hypotheses": "【可选】待验证假设数组，不参与评分扣分，单独渲染在附录区；结构同 issues，但不需要 severity。",
+    "issues[].root_cause": "【建议必填，缺省按 flow 兼容历史数据】归因：flow（流程/交互实现缺陷，计分）/ sample（换真实数据即消失，**照常记录但不计分**，统一进「样本数据待对齐清单」）/ polish（视觉文案打磨，计分且只到 P3/P4）。判定：把对象名与数值换成真实的后问题还在吗？在→flow，不在→sample；说不出阻断了哪一步→polish。"
   },
-
   "project": "",
   "scenario": "",
   "persona": "",
   "date": "",
-
   "issues": [
     {
       "img_file": "",
@@ -31,6 +29,7 @@
       "scenario_tag": "",
       "dimensions": [],
       "severity": "",
+      "root_cause": "",
       "confidence_text": "高置信",
       "title": "",
       "related_task": "",
@@ -41,28 +40,23 @@
       "solution": ""
     }
   ],
-
   "dimensions": {
     "dim1_intent": "验证核心用户主任务剧本的通畅度与体验目标闭环",
     "dim1_content": "",
     "dim1_result": "未显式走查",
     "dim1_explanation": "",
-
     "dim2_intent": "评估方案与产品愿景、品牌内核及更高维解法的契合度",
     "dim2_content": "",
     "dim2_result": "未显式走查",
     "dim2_explanation": "",
-
     "dim3_intent": "排查通用 UX 交互原则、表单校验、防错及状态反馈合规性",
     "dim3_content": "",
     "dim3_result": "未显式走查",
     "dim3_explanation": "",
-
     "dim4_intent": "扫描全状态矩阵、极端临界数据与环境自适应能力",
     "dim4_content": "",
     "dim4_result": "未显式走查",
     "dim4_explanation": ""
   },
-
   "hypotheses": []
 }

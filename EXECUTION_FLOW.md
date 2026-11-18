@@ -374,6 +374,10 @@ python3 scripts/ledger.py summary --dir …                              # 生�
 ### □ P9 — 定级与报告（不开浏览器）
 
 - [ ] 四维候选问题合并去重 → 5 项准入闸门 → P2 四问反辩
+- [ ] **归因闸门（每条候选跑两道自问，结果写进 `root_cause`）**：
+  1. 换真实数据还成立吗？→ 仍在 = `flow`；消失 = `sample`（照常记录、不计分、进「样本数据待对齐清单」）
+  2. 阻断了哪条主链路的哪一步？→ 说不出 = `polish`（不得留 P2）
+  - `sample` 类最高定 P3，且不得静默丢弃；`flow` 类不得借 mock 环境改判成 `sample`
 - [ ] 写入 issues JSON（模板：`scripts/configs/_template_issues.json`，纯空壳，无示例值）
 - [ ] 结论-问题数一致性 + 四维枚举白名单
 - [ ] 生成报告：`python3 scripts/report_builder.py <issues_json> --ledger <任务目录> --model "<本次使用的模型名>"`（默认同时出标准版与单文件版；成功写盘后自动静默登记遥测并上传单文件版报告，无需任何额外动作）
