@@ -48,6 +48,17 @@ import urllib.error
 RUNTIME_DIR = os.path.join(tempfile.gettempdir(), 'design_review_runner')
 STATE_FILE = os.path.join(RUNTIME_DIR, 'browser_session.json')
 PROFILE_ROOT = os.path.join(RUNTIME_DIR, 'profiles')
+LOG_ROOT = os.path.join(RUNTIME_DIR, 'logs')
+STDERR_TAIL_LIMIT = 1500
+
+
+class LaunchError(RuntimeError):
+    """浏览器拉不起来时的结构化失败：机器可读 code + 可原样粘贴给排查方的 diag。"""
+
+    def __init__(self, code, message, diag=None):
+        super().__init__(message)
+        self.code = code
+        self.diag = diag or {}
 
 
 # ──────────────────────────────────────────────────────────────
@@ -659,6 +670,97 @@ def _is_alive(state):
         return False
 
 
+def _tail(path, limit=STDERR_TAIL_LIMIT):
+    """读取日志尾部（浏览器 stderr），用于把「超时」还原成可读的失败原因。"""
+    try:
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
+            data = f.read()
+    except OSError:
+        return ''
+    return data.strip()[-limit:]
+
+
+def _port_listening(port, timeout=1.0):
+    """端口上是否真有进程在 listen：区分「浏览器没起来」与「起来了但回环被拦」。"""
+    try:
+        with socket.create_connection(('127.0.0.1', int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _terminate(proc):
+    """尽力结束刚拉起但不可用的浏览器进程，避免每次失败在后台漏一个 Chrome。"""
+    try:
+        if platform.system() == 'Windows':
+            subprocess.run(['taskkill', '/PID', str(proc.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            proc.terminate()
+        proc.wait(timeout=5)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _explain_launch_failure(proc, port, binary, profile_dir, log_path, cause):
+    """把「CDP 端口未就绪」拆成三类互斥失败，并给出各自的处置方向。
+
+    旧实现把浏览器 stderr 丢进 DEVNULL，三种失败（浏览器没起来 / 回环被拦 /
+    端口被占）在超时后表现完全一样，降级原因只能由模型自行猜测。
+    """
+    exit_code = proc.poll()
+    listening = _port_listening(port)
+    stderr_tail = _tail(log_path)
+    diag = {
+        'binary': binary,
+        'pid': proc.pid,
+        'port': int(port),
+        'exit_code': exit_code,
+        'port_listening': listening,
+        'profile': profile_dir,
+        'stderr_log': log_path,
+        'stderr_tail': stderr_tail,
+        'cause': str(cause),
+    }
+    _clear_state()
+
+    if exit_code is not None:
+        diag['terminated'] = False
+        raise LaunchError(
+            'CHROME_EXITED',
+            '浏览器进程在启动后立即退出（exit=%s），CDP 端口 %d 从未就绪。'
+            '说明浏览器本体没跑起来，问题在进程启动层（沙箱禁止启动 GUI 进程、'
+            'profile 目录不可写、启动参数被拦截），不在自动化驱动层。'
+            '处置方向：由使用方在 Agent 环境侧放开沙箱/权限；安装任何包都无解。'
+            'stderr 尾部见 diag.stderr_tail。' % (exit_code, int(port)),
+            diag,
+        )
+
+    diag['terminated'] = _terminate(proc)
+
+    if not listening:
+        raise LaunchError(
+            'CDP_UNREACHABLE',
+            '浏览器进程存活（pid=%d），但 127.0.0.1:%d 上没有进程在 listen，'
+            'CDP 会话无法建立。说明浏览器起来了却连不通，最常见原因是执行环境'
+            '沙箱阻断回环（loopback）网络（macOS seatbelt / Linux seccomp / '
+            'Windows AppContainer 默认禁回环）。'
+            '处置方向：放通回环网络，或在 Agent 环境侧改用浏览器 MCP；'
+            '安装 Playwright/Puppeteer 无法绕过该限制。' % (proc.pid, int(port)),
+            diag,
+        )
+
+    raise LaunchError(
+        'CDP_HANDSHAKE_FAILED',
+        '端口 %d 已处于 listen 状态，但 /json/version 无响应（%s）。'
+        '可能是端口被其它进程占用，或浏览器调试端点未正常初始化。'
+        '可重跑一次以换用新端口；仍失败请检查 diag.stderr_tail。'
+        % (int(port), cause),
+        diag,
+    )
+
+
 def launch(binary=None, width=1440, height=900, dpr=1, headless=False, url='about:blank'):
     """拉起浏览器（独立临时 profile + 随机 CDP 端口），返回 state。"""
     state = _read_state()
@@ -666,20 +768,30 @@ def launch(binary=None, width=1440, height=900, dpr=1, headless=False, url='abou
         return state, False  # 复用已有会话
 
     if binary and not os.path.exists(binary):
-        raise RuntimeError('BROWSER_NOT_FOUND：指定的浏览器二进制不存在：%s' % binary)
+        raise LaunchError(
+            'BROWSER_NOT_FOUND',
+            'BROWSER_NOT_FOUND：指定的浏览器二进制不存在：%s' % binary,
+            {'binary': binary},
+        )
 
     if not binary:
         found = detect_browsers()
         if not found:
-            raise RuntimeError(
+            raise LaunchError(
+                'NO_BROWSER_FOUND',
                 'NO_BROWSER_FOUND：本机未探测到任何可用的 Chromium 系浏览器二进制。'
-                '（不会尝试安装，请回落 IDE 内置浏览器）'
+                '（不会尝试安装，请回落 IDE 内置浏览器）',
+                {'platform': platform.system()},
             )
         binary = found[0]
 
     port = _pick_free_port()
     profile_dir = os.path.join(PROFILE_ROOT, 'run-%d' % port)
     os.makedirs(profile_dir, exist_ok=True)
+    # 浏览器 stderr 必须留证：丢进 DEVNULL 会让「沙箱禁 GUI」「回环被拦」「端口被占」
+    # 在超时后表现成同一条「端口未就绪」，降级原因只能靠猜。
+    os.makedirs(LOG_ROOT, exist_ok=True)
+    log_path = os.path.join(LOG_ROOT, 'chrome-%d.log' % port)
 
     args = [
         binary,
@@ -697,11 +809,15 @@ def launch(binary=None, width=1440, height=900, dpr=1, headless=False, url='abou
         args.append('--headless=new')
     args.append(url)
 
-    proc = subprocess.Popen(
-        args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    _wait_for_cdp(port)
+    with open(log_path, 'wb') as log_fh:
+        proc = subprocess.Popen(
+            args, stdout=log_fh, stderr=log_fh,
+            start_new_session=True,
+        )
+    try:
+        _wait_for_cdp(port)
+    except Exception as e:  # 统一转成结构化诊断，再由 CLI 原样回传
+        _explain_launch_failure(proc, port, binary, profile_dir, log_path, e)
 
     state = {
         'pid': proc.pid, 'port': port, 'binary': binary,
@@ -1116,7 +1232,12 @@ def main():
     try:
         sys.exit(args.func(args))
     except Exception as e:
-        _emit({'status': 'error', 'error': str(e)})
+        payload = {'status': 'error', 'error': str(e)}
+        # 拉不起来时把失败点原样回传，避免上层把「超时」自行解释成「沙箱限制」。
+        if isinstance(e, LaunchError):
+            payload['error_code'] = e.code
+            payload['diag'] = e.diag
+        _emit(payload)
         sys.exit(1)
 
 
